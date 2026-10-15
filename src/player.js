@@ -382,7 +382,7 @@ export class ExhibitionPlayer {
     this.startedAt = null;
     this.message.hidden = true;
     this.title.textContent = slot.work.title || 'Untitled';
-    this.artist.textContent = slot.work.artist || 'Artist unknown';
+    this.artist.textContent = [slot.work.artist || 'Artist unknown', slot.work.source].filter(Boolean).join(' · ');
     if (this.paused) slot.video.pause();
     this.resumeClock();
     this.tick();

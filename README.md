@@ -28,7 +28,7 @@ npm start     # Serves the production build locally
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Close or Escape leaves the player; some browsers use the first Escape to leave fullscreen.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
-Art plays silently and loops. **9:16 screen** filters for videos at least 1080 × 1920 that cover at least 90% of the portrait display without cropping. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show actual decoded dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
+Art plays silently and loops. Artist captions show the artwork title, then **Artist · Source** (for example, **Cromwell · objkt**). **9:16 screen** filters for videos at least 1080 × 1920 that cover at least 90% of the portrait display without cropping. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show actual decoded dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
 
 For a four-hour event, start the one-hour mix and leave it running. Every work appears once per pass, then the next pass uses a fresh shuffle with no immediate repeat at the boundary. The exhibition continues until you stop it; there is no four-hour cutoff. Loading delays, pauses, and unavailable works can change the wall-clock length of a pass.
 

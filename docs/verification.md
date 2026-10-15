@@ -14,6 +14,7 @@ Transition release checked on 2026-10-16. Catalog/media and physical-resolution 
 
 Tested in the Codex browser:
 
+- Source captions checked on 2026-10-16: actual playback shows **Resonant Fluidity / Cromwell · objkt** and **Calculated Movements #5 / Larry Cuba · Verse**. Titles remain on their own line, with the artist and marketplace beneath.
 - Transition release: older saved exhibitions default to **Soft fade · 1.5 seconds**; **No transition** persists across reload. Changing other settings and building a portrait mix preserve the selected transition.
 - Actual automatic and manual fades use the incoming video above an opaque outgoing video. During a measured dissolve, the incoming layer had opacity 0.027 with a 1.5-second transition while the outgoing layer remained at opacity 1. Both video slots work as the incoming layer on successive changes.
 - Paused navigation blends decoded frames while both videos stay paused. Rapid Next during a fade settles the current image before the outgoing slot is loaded again; playback resumes normally afterward. **No transition** switches between decoded videos with zero transition duration and immediately pauses the outgoing one. No browser console errors were recorded.

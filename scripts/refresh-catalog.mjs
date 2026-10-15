@@ -8,8 +8,8 @@ import { resolve } from 'node:path';
 const catalogPath = fileURLToPath(new URL('../public/catalog.json', import.meta.url));
 
 export function validateCatalog(catalog) {
-  if (catalog?.version !== 1 || !Array.isArray(catalog.works) || catalog.works.length < 24) {
-    throw new Error('Refusing an empty or incomplete catalog (minimum 24 selected works).');
+  if (catalog?.version !== 1 || !Array.isArray(catalog.works) || catalog.works.length < 120 || catalog.works.length > 150) {
+    throw new Error('Refusing an empty or incomplete catalog (120–150 selected works required).');
   }
   const ids = new Set();
   const media = new Set();
@@ -35,7 +35,7 @@ export function validateCatalog(catalog) {
     const sourceHost = work.source === 'objkt' ? 'objkt.com' : 'verse.works';
     if (new URL(work.sourceUrl).hostname !== sourceHost) throw new Error(`${work.id}: incorrect source attribution`);
   }
-  if (artists.size < 24) throw new Error('The selection must represent at least 24 distinct artists.');
+  if (artists.size < 60) throw new Error('The selection must represent at least 60 distinct artists.');
   return { works: ids.size, artists: artists.size };
 }
 

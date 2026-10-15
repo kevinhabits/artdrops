@@ -1,5 +1,6 @@
 export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', captions: true, shuffle: false });
 export const MAX_WORKS = 150;
+export const HOUR_MIX_SIZE = 120;
 export function safeUrl(value) {
   try {
     const url = new URL(value);
@@ -56,8 +57,17 @@ export function readExhibition(input) {
 export function makeExhibition(works, settings) {
   return { format: 'artdrops-exhibition', version: 1, exportedAt: new Date().toISOString(), settings: cleanSettings(settings), works: uniqueWorks(works) };
 }
+export function makeHourMix(works, settings) {
+  const selected = uniqueWorks(works).slice(0, HOUR_MIX_SIZE);
+  if (selected.length < HOUR_MIX_SIZE) return null;
+  return { works: selected, settings: cleanSettings({ ...settings, duration: 30, shuffle: true }) };
+}
 export function durationLabel(count, seconds) {
   const total = count * seconds;
   if (total < 60) return `${total} sec loop`;
+  if (total >= 3600) {
+    const hours = Math.floor(total / 3600), minutes = Number(((total % 3600) / 60).toFixed(1));
+    return `${hours} hr${minutes ? ` ${minutes} min` : ''} loop`;
+  }
   return `${Number((total / 60).toFixed(1))} min loop`;
 }

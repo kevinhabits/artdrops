@@ -23,12 +23,14 @@ npm start     # Serves the production build locally
 ## Put on a show
 
 1. Connect the laptop to the display. Select 3840 × 2160 in the computer's display settings if supported, and move this browser window to the external display.
-2. Add or remove works, reorder with the arrows, and choose 10–120 seconds per work. The initial six works are from different artists.
+2. Choose **Build a 1-hour mix** for 120 different works, 30 seconds each, with shuffle enabled. Or make your own selection, reorder with the arrows, and choose 10–120 seconds per work. The initial six works are from different artists; the mix button replaces your selection and offers Undo.
 3. Choose **Show full artwork** to preserve the composition, or **Fill screen** to crop to the display. Artist captions and shuffle are optional.
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Close or Escape leaves the player; some browsers use the first Escape to leave fullscreen.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
 Art plays silently and loops. Playback uses the source video's available resolution; a 4K display does not make a lower-resolution original 4K.
+
+For a four-hour event, start the one-hour mix and leave it running. Every work appears once per pass, then the next pass uses a fresh shuffle with no immediate repeat at the boundary. The exhibition continues until you stop it; there is no four-hour cutoff. Loading delays, pauses, and unavailable works can change the wall-clock length of a pass.
 
 ## Your exhibition
 

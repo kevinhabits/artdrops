@@ -1,5 +1,5 @@
 import { ExhibitionPlayer } from './player.js';
-import { DEFAULT_SETTINGS, MAX_WORKS, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, readExhibition, durationLabel, safeUrl } from './core.js';
+import { DEFAULT_SETTINGS, MAX_WORKS, HOUR_MIX_SIZE, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, readExhibition, durationLabel, safeUrl } from './core.js';
 
 const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = 'artdrops:exhibition:v1';
@@ -231,6 +231,17 @@ for (const id of ['duration', 'fit', 'captions', 'shuffle']) {
   });
 }
 $('#clear-queue').addEventListener('click', () => { const previous = [...queue]; queue = []; updateQueue(); persist(); notify('Exhibition cleared.', () => { queue = previous; updateQueue(); persist(); }); });
+$('#hour-mix').addEventListener('click', () => {
+  const mix = makeHourMix(catalog, settings);
+  if (!mix) return;
+  const previous = { queue, settings };
+  queue = mix.works; settings = mix.settings;
+  syncSettings(); updateQueue(); persist();
+  $('#start-show').focus({ preventScroll: true });
+  notify('1-hour mix ready. A fresh shuffle every loop, for as long as you like.', () => {
+    ({ queue, settings } = previous); syncSettings(); updateQueue(); persist();
+  });
+});
 for (const id of ['search', 'source-filter', 'shape-filter']) $(`#${id}`).addEventListener(id === 'search' ? 'input' : 'change', () => { visibleCount = PAGE_SIZE; renderLibrary(); });
 $('#reset-filters').addEventListener('click', () => { $('#search').value = ''; $('#source-filter').value = 'all'; $('#shape-filter').value = 'all'; visibleCount = PAGE_SIZE; renderLibrary(); });
 $('#load-more').addEventListener('click', () => { visibleCount += PAGE_SIZE; renderLibrary(); });
@@ -319,6 +330,7 @@ async function loadCatalog() {
     if (result.version !== 1 || !Array.isArray(result.works)) throw new Error('Invalid catalog');
     const works = uniqueWorks(result.works); if (!works.length) throw new Error('Empty catalog');
     catalog = works; loaded = true;
+    $('#hour-mix').disabled = catalog.length < HOUR_MIX_SIZE;
     const fresh = new Map(catalog.map(work => [work.id, work])); queue = queue.map(work => fresh.get(work.id) || work);
     if (!saved && !queue.length) {
       const artists = new Set();

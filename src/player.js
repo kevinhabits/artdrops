@@ -223,7 +223,8 @@ export class ExhibitionPlayer {
       if (position >= order.length) {
         if (this.settings.shuffle) {
           order = shuffleWorks(order, this.active?.work.id);
-          const first = order.findIndex((work) => !this.failed.has(work.id) && work.id !== this.active?.work.id);
+          let first = order.findIndex((work) => !this.failed.has(work.id) && work.id !== this.active?.work.id);
+          if (first < 0) first = order.findIndex((work) => !this.failed.has(work.id));
           if (first > 0) [order[0], order[first]] = [order[first], order[0]];
         }
         position = 0;

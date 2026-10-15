@@ -179,3 +179,115 @@ test('a fullscreen request that completes after close releases its acquired full
     else globalThis.document = original;
   }
 });
+
+test('shuffle keeps the last healthy work playing when the rest of the cycle has failed', (context) => {
+  context.mock.method(Math, 'random', () => 0.999);
+  const player = new ExhibitionPlayer();
+  const works = ['a', 'b', 'c'].map(work);
+  Object.assign(player, {
+    order: works,
+    position: 0,
+    active: { work: works[0] },
+    failed: new Set(['b', 'c']),
+    settings: { shuffle: true },
+  });
+  const next = player.plan(1);
+  assert.ok(next);
+  assert.equal(next.order[next.position].id, 'a');
+});
+
+// Exercise the real loading, promotion, preloading, timer advancement and
+// failure paths. Only the browser's network and video elements are simulated.
+function simulatedExhibition(works) {
+  const player = new ExhibitionPlayer();
+  const slots = [0, 1].map(() => ({
+    watchdog: null,
+    video: {
+      src: '', currentTime: 0, videoWidth: 1920, readyState: 4, error: null,
+      classList: { add() {}, remove() {} },
+      getAttribute() { return this.src; },
+      pause() {},
+      load() { this.error = null; this.currentTime = 0; },
+      play() { return Promise.resolve(); },
+    },
+  }));
+  Object.assign(player, {
+    opened: true, session: 1, slots,
+    order: shuffleWorks(works), position: 0,
+    settings: { shuffle: true, duration: 30 },
+    failed: new Set(), paused: false,
+    active: null, pending: null, nextPlan: null, elapsed: 0, startedAt: null,
+    message: {}, title: {}, artist: {}, counter: {},
+    progress: { style: { setProperty() {} } },
+  });
+  return player;
+}
+
+for (const unavailableCount of [0, 12]) {
+  test(`four simulated hours use every healthy artwork once per cycle, with ${unavailableCount} unavailable works`, (context) => {
+    let seed = 137;
+    context.mock.method(Math, 'random', () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 2 ** 32;
+    });
+    const original = globalThis.document;
+    // No transition may allocate extra video nodes after the two-slot setup.
+    globalThis.document = { hidden: false, createElement() { assert.fail('unexpected DOM allocation during playback'); } };
+    const works = Array.from({ length: 120 + unavailableCount }, (_, index) => work(`work-${index}`));
+    const unavailable = new Set(works.slice(120).map((item) => item.id));
+    const expected = works.slice(0, 120).map((item) => item.id).sort();
+    const player = simulatedExhibition(works);
+    const videos = new Set(player.slots.map((slot) => slot.video));
+    const cycles = [];
+    const failures = new Map();
+    let currentOrder;
+    let previousId;
+    try {
+      player.requestWork(0);
+      for (let shown = 0; shown < 480; shown++) {
+        while (player.pending && unavailable.has(player.pending.work.id)) {
+          const { work: artwork, slot } = player.pending;
+          failures.set(artwork.id, (failures.get(artwork.id) || 0) + 1);
+          slot.video.error = { code: 4 };
+          player.videoEvent(slot, 'error');
+        }
+        assert.ok(player.pending, 'a healthy video remains available');
+        const slot = player.pending.slot;
+        player.videoEvent(slot, 'playing');
+        clearTimeout(player.fadeTimer);
+        const id = player.active.work.id;
+        if (player.order !== currentOrder) {
+          if (currentOrder) assert.notEqual(id, previousId, 'cycle boundary cannot immediately repeat');
+          cycles.push([]);
+          currentOrder = player.order;
+        }
+        cycles.at(-1).push(id);
+        previousId = id;
+        assert.equal(videos.has(player.active.video), true);
+        assert.equal(player.slots.length, 2);
+        assert.equal(player.active.video.src, player.active.work.mediaUrl);
+        player.preloadNext();
+        assert.equal(videos.has(player.slots.find((candidate) => candidate !== player.active).video), true);
+        if (shown < 479) {
+          player.elapsed = 30_000;
+          player.startedAt = null;
+          player.active.video.currentTime += 30;
+          player.tick();
+        }
+      }
+      assert.equal(cycles.length, 4);
+      for (const cycle of cycles) {
+        assert.equal(cycle.length, 120);
+        assert.deepEqual([...cycle].sort(), expected);
+      }
+      assert.equal(player.failed.size, unavailableCount);
+      for (const attempts of failures.values()) assert.equal(attempts, 1, 'failed works stay quarantined across cycles');
+    } finally {
+      player.opened = false;
+      clearTimeout(player.fadeTimer);
+      for (const slot of player.slots) player.clearWatch(slot);
+      if (original === undefined) delete globalThis.document;
+      else globalThis.document = original;
+    }
+  });
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanWork, cleanSettings, filterWorks, moveItem, makeExhibition, readExhibition, safeUrl, uniqueWorks, rememberCustomWork, MAX_WORKS, durationLabel } from '../src/core.js';
+import { cleanWork, cleanSettings, filterWorks, moveItem, makeExhibition, makeHourMix, readExhibition, safeUrl, uniqueWorks, rememberCustomWork, MAX_WORKS, durationLabel } from '../src/core.js';
 const work = { id: '1', title: 'Moving Colors', artist: 'A Person', kind: 'video', mediaUrl: 'https://example.com/art.mp4', width: 1920, height: 1080, source: 'objkt', sourceUrl: 'https://objkt.com/tokens/1' };
 test('import/export preserves order and display preferences', () => {
   const exported = makeExhibition([work, { ...work, id: '2', title: 'Second' }], { duration: 60, captions: false, shuffle: true, fit: 'cover' });
@@ -51,4 +51,23 @@ test('a full custom library makes room without losing any selected exhibition wo
   assert.ok(queue.every(selected => remembered.some(item => item.id === selected.id)));
   assert.equal(remembered.some(item => item.id === custom[0].id), false);
   assert.equal(custom.length, MAX_WORKS);
+});
+test('one-hour mix uses 120 distinct playable works and preserves display preferences', () => {
+  const works = Array.from({ length: 132 }, (_, index) => ({ ...work, id: String(index) }));
+  const settings = { duration: 120, shuffle: false, captions: false, fit: 'cover' };
+  const mix = makeHourMix([works[0], ...works], settings);
+  assert.equal(mix.works.length, 120);
+  assert.equal(new Set(mix.works.map(item => item.id)).size, 120);
+  assert.equal(mix.works.length * mix.settings.duration, 3600);
+  assert.deepEqual(mix.settings, { duration: 30, shuffle: true, captions: false, fit: 'cover' });
+  assert.deepEqual(readExhibition(makeExhibition(mix.works, mix.settings)), mix);
+  assert.equal(settings.duration, 120);
+  assert.equal(works.length, 132);
+  assert.equal(makeHourMix(works.slice(0, 119), settings), null);
+  assert.equal(makeHourMix([...works.slice(0, 119), works[0], { ...work, id: 'bad', kind: 'image' }], settings), null);
+});
+test('long exhibition durations stay readable', () => {
+  assert.equal(durationLabel(120, 30), '1 hr loop');
+  assert.equal(durationLabel(132, 30), '1 hr 6 min loop');
+  assert.equal(durationLabel(120, 120), '4 hr loop');
 });

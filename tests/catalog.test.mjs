@@ -7,8 +7,9 @@ const catalog = JSON.parse(await readFile(new URL('../public/catalog.json', impo
 
 test('curated catalog has real source links, motion media, dimensions, and artist diversity', () => {
   const counts = validateCatalog(catalog);
-  assert.ok(counts.works >= 24);
-  assert.ok(counts.artists >= 24);
+  assert.ok(counts.works >= 120 && counts.works <= 150);
+  assert.ok(counts.artists >= 60);
+  assert.ok(counts.works * 30 >= 60 * 60, 'At 30 seconds per work, the catalog must fill at least one distinct hour');
   assert.equal(new Set(catalog.works.slice(0, 6).map(work => work.artistKey)).size, 6);
   for (const work of catalog.works) {
     if (work.source === 'objkt') {
@@ -20,6 +21,7 @@ test('curated catalog has real source links, motion media, dimensions, and artis
 
 test('failed or empty refresh cannot pass catalog validation', () => {
   assert.throws(() => validateCatalog({ version: 1, works: [] }), /incomplete catalog/);
+  assert.throws(() => validateCatalog({ ...catalog, works: catalog.works.slice(0, 119) }), /incomplete catalog/);
   const invalid = structuredClone(catalog);
   invalid.works[1].id = invalid.works[0].id;
   assert.throws(() => validateCatalog(invalid), /duplicate/);

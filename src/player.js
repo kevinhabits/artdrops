@@ -60,6 +60,7 @@ export class ExhibitionPlayer {
       fit: settings.fit === 'cover' ? 'cover' : 'contain',
       captions: settings.captions !== false,
       shuffle: settings.shuffle === true,
+      transition: settings.transition === 'none' ? 'none' : 'fade',
     };
     const ids = new Set();
     this.works = (Array.isArray(works) ? works : []).filter((work) => {
@@ -73,11 +74,13 @@ export class ExhibitionPlayer {
     this.active = null;
     this.pending = null;
     this.nextPlan = null;
+    this.fadeState = null;
     this.paused = false;
     this.elapsed = 0;
     this.startedAt = null;
     this.opened = true;
     this.controller = new AbortController();
+    this.reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
     this.previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -86,6 +89,7 @@ export class ExhibitionPlayer {
     dialog.setAttribute('aria-label', 'ArtDrops exhibition player');
     dialog.tabIndex = -1;
     this.dialog = dialog;
+    dialog.style.setProperty('--player-fade-duration', `${this.transitionDuration()}ms`);
     const stage = document.createElement('div');
     stage.className = 'player-stage';
     this.slots = [0, 1].map(() => {
@@ -155,6 +159,10 @@ export class ExhibitionPlayer {
     dialog.append(this.progress);
 
     const signal = this.controller.signal;
+    this.reducedMotion?.addEventListener('change', () => {
+      dialog.style.setProperty('--player-fade-duration', `${this.transitionDuration()}ms`);
+      if (this.reducedMotion.matches) this.finishTransition(true);
+    }, { signal });
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); this.close(); }, { signal });
     dialog.addEventListener('close', () => { if (this.opened) this.close(); }, { signal });
     dialog.addEventListener('pointermove', () => this.showControls(), { signal });
@@ -244,16 +252,33 @@ export class ExhibitionPlayer {
     this.requestWork(plan.position);
   }
 
-  requestWork(position, sourceIndex = 0) {
+  requestWork(position, sourceIndex = null) {
     if (!this.opened) return;
+    // Complete the visible blend before reusing either of its two video slots.
+    this.finishTransition();
     this.freezeClock();
-    clearTimeout(this.fadeTimer);
     this.nextPlan = null;
     const work = this.order[position];
     if (!work) return this.unavailable();
+    if (sourceIndex === null && this.active?.work.id === work.id && !this.failed.has(work.id)
+      && !this.active.buffering && !this.active.video.error && this.active.video.readyState >= 2) {
+      if (this.pending) {
+        this.clearWatch(this.pending.slot);
+        this.pending.slot.playToken = null;
+        this.pending.slot.video.pause();
+        this.pending = null;
+      }
+      this.position = position;
+      this.active.position = position;
+      this.elapsed = 0;
+      this.resumeClock();
+      this.tick();
+      this.preloadNext();
+      return;
+    }
     const slot = this.slots.find((candidate) => candidate !== this.active);
     this.position = position;
-    this.pending = { slot, work, position, sourceIndex, token: Symbol('playback') };
+    this.pending = { slot, work, position, sourceIndex: sourceIndex ?? 0, token: Symbol('playback') };
     this.loadPending();
   }
 
@@ -358,25 +383,62 @@ export class ExhibitionPlayer {
     this.message.hidden = true;
     this.title.textContent = slot.work.title || 'Untitled';
     this.artist.textContent = slot.work.artist || 'Artist unknown';
-    slot.video.classList.add('is-active');
     if (this.paused) slot.video.pause();
     this.resumeClock();
     this.tick();
-    const session = this.session;
-    clearTimeout(this.fadeTimer);
-    if (previous && previous !== slot) previous.video.classList.remove('is-active');
-    // Let the outgoing moving image finish its fade before reusing its element.
+    this.beginTransition(slot, previous);
+  }
+
+  transitionDuration() {
+    return this.settings.transition === 'none' || this.reducedMotion?.matches ? 0 : 1500;
+  }
+
+  beginTransition(incoming, outgoing) {
+    const duration = this.transitionDuration();
+    this.dialog.style.setProperty('--player-fade-duration', `${duration}ms`);
+    incoming.video.style.transition = 'none';
+    incoming.video.classList.remove('is-active');
+    incoming.video.style.zIndex = '2';
+    if (outgoing) {
+      outgoing.video.style.transition = 'none';
+      outgoing.video.style.zIndex = '1';
+      outgoing.video.classList.add('is-active');
+    }
+    // Flush the incoming layer at opacity zero before enabling its transition.
+    // The fully opaque outgoing image stays underneath until the fade ends.
+    if (duration) void incoming.video.offsetWidth;
+    incoming.video.style.transition = duration ? '' : 'none';
+    incoming.video.classList.add('is-active');
+    const state = { incoming, outgoing, session: this.session };
+    this.fadeState = state;
+    if (!duration) { this.finishTransition(true); return; }
     this.fadeTimer = setTimeout(() => {
-      if (!this.opened || this.session !== session) return;
-      if (previous && previous !== this.active) {
-        previous.video.pause();
-        this.clearWatch(previous);
+      if (this.opened && this.session === state.session && this.fadeState === state) this.finishTransition(true);
+    }, duration);
+  }
+
+  finishTransition(preload = false) {
+    clearTimeout(this.fadeTimer);
+    this.fadeTimer = null;
+    const state = this.fadeState;
+    this.fadeState = null;
+    if (state) {
+      state.incoming.video.style.transition = 'none';
+      state.incoming.video.classList.add('is-active');
+      state.incoming.video.style.zIndex = '1';
+      if (state.outgoing) {
+        state.outgoing.video.style.transition = 'none';
+        state.outgoing.video.classList.remove('is-active');
+        state.outgoing.video.style.zIndex = '0';
+        state.outgoing.video.pause();
+        this.clearWatch(state.outgoing);
       }
-      if (!this.pending) this.preloadNext();
-    }, previous ? 650 : 0);
+    }
+    if (preload && this.opened && !this.pending) this.preloadNext();
   }
 
   preloadNext() {
+    if (!this.opened || !this.active || this.pending || this.fadeState) return;
     this.nextPlan = this.plan(1);
     if (!this.nextPlan) return;
     const work = this.nextPlan.order[this.nextPlan.position];
@@ -425,6 +487,7 @@ export class ExhibitionPlayer {
   }
 
   unavailable(message = 'These videos are unavailable right now. Check your connection, then close and relaunch the exhibition.') {
+    this.finishTransition();
     this.freezeClock();
     this.pending = null;
     this.active = null;
@@ -567,6 +630,7 @@ export class ExhibitionPlayer {
 
   close() {
     if (!this.opened) return;
+    this.finishTransition();
     this.releaseFullscreen();
     this.opened = false;
     this.session += 1;

@@ -200,17 +200,21 @@ test('shuffle keeps the last healthy work playing when the rest of the cycle has
 // failure paths. Only the browser's network and video elements are simulated.
 function simulatedExhibition(works) {
   const player = new ExhibitionPlayer();
-  const slots = [0, 1].map(() => ({
+  const slots = [0, 1].map(() => {
+    const classes = new Set();
+    return {
     watchdog: null,
     video: {
       src: '', currentTime: 0, videoWidth: 1920, readyState: 4, error: null,
-      classList: { add() {}, remove() {} },
+      paused: true, loads: [], style: {},
+      classList: { add(value) { classes.add(value); }, remove(value) { classes.delete(value); }, contains(value) { return classes.has(value); } },
       getAttribute() { return this.src; },
-      pause() {},
-      load() { this.error = null; this.currentTime = 0; },
-      play() { return Promise.resolve(); },
+      removeAttribute(name) { if (name === 'src') this.src = ''; },
+      pause() { this.paused = true; },
+      load() { this.loads.push({ src: this.src, visible: classes.has('is-active') }); this.error = null; this.currentTime = 0; },
+      play() { this.paused = false; return Promise.resolve(); },
     },
-  }));
+  }; });
   Object.assign(player, {
     opened: true, session: 1, slots,
     order: shuffleWorks(works), position: 0,
@@ -218,10 +222,185 @@ function simulatedExhibition(works) {
     failed: new Set(), paused: false,
     active: null, pending: null, nextPlan: null, elapsed: 0, startedAt: null,
     message: {}, title: {}, artist: {}, counter: {},
+    dialog: { style: { setProperty() {} } },
     progress: { style: { setProperty() {} } },
   });
   return player;
 }
+
+function transitionSimulation(context, options = {}) {
+  const original = globalThis.document;
+  globalThis.document = { hidden: false, body: { style: {} } };
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const works = ['a', 'b', 'c'].map(work);
+  const player = simulatedExhibition(works);
+  player.order = works;
+  player.settings = { duration: 30, shuffle: false, transition: options.transition || 'fade' };
+  player.reducedMotion = { matches: options.reducedMotion || false };
+  context.after(() => {
+    player.opened = false;
+    player.finishTransition();
+    for (const slot of player.slots) player.clearWatch(slot);
+    if (original === undefined) delete globalThis.document;
+    else globalThis.document = original;
+  });
+  const show = (position) => {
+    player.requestWork(position);
+    if (!player.pending) return player.active;
+    const slot = player.pending.slot;
+    player.videoEvent(slot, player.paused ? 'loadeddata' : 'playing');
+    return slot;
+  };
+  return { player, show };
+}
+
+test('gentle fade retains the opaque moving outgoing layer until incoming is shown, then safely preloads', (context) => {
+  const { player, show } = transitionSimulation(context);
+  const outgoing = show(0);
+  player.finishTransition();
+  const incoming = show(1);
+  assert.equal(player.transitionDuration(), 1500);
+  assert.equal(outgoing.video.classList.contains('is-active'), true);
+  assert.equal(incoming.video.classList.contains('is-active'), true);
+  assert.equal(outgoing.video.style.zIndex, '1');
+  assert.equal(incoming.video.style.zIndex, '2');
+  assert.equal(outgoing.video.paused, false);
+  assert.equal(player.elapsed, 0);
+  assert.ok(player.startedAt !== null, 'the exhibition clock starts at promotion, not after fading');
+  context.mock.timers.tick(1499);
+  assert.equal(outgoing.video.src, work('a').mediaUrl);
+  assert.equal(outgoing.video.paused, false);
+  context.mock.timers.tick(1);
+  assert.equal(player.fadeState, null);
+  assert.equal(outgoing.video.paused, true);
+  assert.equal(outgoing.video.classList.contains('is-active'), false);
+  assert.equal(outgoing.video.src, work('c').mediaUrl);
+  assert.equal(outgoing.video.loads.at(-1).visible, false);
+  assert.equal(incoming.video.classList.contains('is-active'), true);
+});
+
+for (const options of [{ transition: 'none' }, { reducedMotion: true }]) {
+  test(`${options.transition === 'none' ? 'instant transitions' : 'reduced motion'} release the outgoing slot without a fade delay`, (context) => {
+    const { player, show } = transitionSimulation(context, options);
+    const outgoing = show(0);
+    const incoming = show(1);
+    assert.equal(player.transitionDuration(), 0);
+    assert.equal(player.fadeState, null);
+    assert.equal(player.fadeTimer, null);
+    assert.equal(outgoing.video.paused, true);
+    assert.equal(outgoing.video.classList.contains('is-active'), false);
+    assert.equal(outgoing.video.src, work('c').mediaUrl);
+    assert.equal(incoming.video.style.transition, 'none');
+    assert.equal(incoming.video.classList.contains('is-active'), true);
+  });
+}
+
+test('rapid navigation settles the visible blend before reuse and ignores stale fade callbacks', (context) => {
+  const { player, show } = transitionSimulation(context);
+  const callbacks = [];
+  const schedule = globalThis.setTimeout;
+  context.mock.method(globalThis, 'setTimeout', (callback, duration) => {
+    if (duration === 1500) callbacks.push(callback);
+    return schedule(callback, duration);
+  });
+  const first = show(0);
+  player.finishTransition();
+  const second = show(1);
+  const oldCompletion = callbacks.at(-1);
+  player.requestWork(2);
+  assert.equal(first.video.classList.contains('is-active'), false);
+  assert.equal(first.video.loads.at(-1).visible, false);
+  assert.equal(first.video.src, work('c').mediaUrl);
+  assert.equal(second.video.classList.contains('is-active'), true);
+  assert.equal(second.video.style.transition, 'none');
+  assert.equal(second.video.paused, false);
+  oldCompletion();
+  assert.equal(player.pending.work.id, 'c');
+  player.videoEvent(player.pending.slot, 'playing');
+  const currentFade = player.fadeState;
+  oldCompletion();
+  assert.equal(player.fadeState, currentFade);
+  assert.equal(second.video.paused, false);
+  assert.equal(player.slots.length, 2);
+});
+
+test('close clears a running transition and an old callback cannot mutate a reopened session', (context) => {
+  const { player, show } = transitionSimulation(context);
+  const callbacks = [];
+  const schedule = globalThis.setTimeout;
+  context.mock.method(globalThis, 'setTimeout', (callback, duration) => {
+    if (duration === 1500) callbacks.push(callback);
+    return schedule(callback, duration);
+  });
+  show(0); player.finishTransition(); show(1);
+  const completion = callbacks.at(-1);
+  player.releaseFullscreen = () => {};
+  player.controller = { abort() {} };
+  player.dialog.close = () => {};
+  player.dialog.remove = () => {};
+  player.close();
+  assert.equal(player.fadeState, null);
+  assert.equal(player.fadeTimer, null);
+  assert.ok(player.slots.every((slot) => slot.video.paused && slot.video.src === ''));
+  const replacement = simulatedExhibition(['x', 'y'].map(work));
+  Object.assign(player, replacement, { session: 10 });
+  const newActive = player.slots[0];
+  player.active = newActive;
+  newActive.video.src = work('x').mediaUrl;
+  newActive.video.paused = false;
+  completion();
+  assert.equal(player.active, newActive);
+  assert.equal(newActive.video.paused, false);
+  assert.equal(newActive.video.src, work('x').mediaUrl);
+});
+
+test('a failed incoming work settles its fade before the outgoing slot is reused', (context) => {
+  const { player, show } = transitionSimulation(context);
+  const outgoing = show(0);
+  player.finishTransition();
+  const incoming = show(1);
+  incoming.video.error = { code: 3 };
+  player.videoEvent(incoming, 'error');
+  assert.equal(player.failed.has('b'), true);
+  assert.equal(player.fadeState, null);
+  assert.equal(player.pending.work.id, 'c');
+  assert.equal(outgoing.video.loads.at(-1).visible, false);
+});
+
+test('paused navigation fades decoded still frames without resuming either video', (context) => {
+  const { player, show } = transitionSimulation(context);
+  const outgoing = show(0);
+  player.finishTransition();
+  player.paused = true;
+  player.freezeClock();
+  outgoing.video.pause();
+  const incoming = show(1);
+  assert.equal(outgoing.video.paused, true);
+  assert.equal(incoming.video.paused, true);
+  assert.equal(player.startedAt, null);
+  assert.equal(player.title.textContent, 'b');
+  assert.ok(player.fadeState);
+  context.mock.timers.tick(1500);
+  assert.equal(player.fadeState, null);
+  assert.equal(incoming.video.paused, true);
+});
+
+test('repeating the only healthy artwork keeps its current video without another fade or load', (context) => {
+  const { player, show } = transitionSimulation(context);
+  player.order = [work('a')];
+  const active = show(0);
+  player.finishTransition();
+  const loads = active.video.loads.length;
+  player.elapsed = 30_000;
+  player.startedAt = null;
+  player.advance(1);
+  assert.equal(player.active, active);
+  assert.equal(player.pending, null);
+  assert.equal(player.fadeState, null);
+  assert.equal(active.video.loads.length, loads);
+  assert.equal(active.video.paused, false);
+  assert.equal(player.elapsed, 0);
+});
 
 for (const unavailableCount of [0, 12]) {
   test(`four simulated hours use every healthy artwork once per cycle, with ${unavailableCount} unavailable works`, (context) => {
@@ -254,7 +433,7 @@ for (const unavailableCount of [0, 12]) {
         assert.ok(player.pending, 'a healthy video remains available');
         const slot = player.pending.slot;
         player.videoEvent(slot, 'playing');
-        clearTimeout(player.fadeTimer);
+        player.finishTransition();
         const id = player.active.work.id;
         if (player.order !== currentOrder) {
           if (currentOrder) assert.notEqual(id, previousId, 'cycle boundary cannot immediately repeat');

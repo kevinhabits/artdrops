@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { cleanWork, cleanSettings, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, portraitCoverage, readExhibition, safeUrl, uniqueWorks, rememberCustomWork, MAX_WORKS, MAX_CATALOG_WORKS, durationLabel } from '../src/core.js';
 const work = { id: '1', title: 'Moving Colors', artist: 'A Person', kind: 'video', mediaUrl: 'https://example.com/art.mp4', width: 1920, height: 1080, source: 'objkt', sourceUrl: 'https://objkt.com/tokens/1' };
 test('import/export preserves order and display preferences', () => {
-  const exported = makeExhibition([work, { ...work, id: '2', title: 'Second' }], { duration: 60, captions: false, shuffle: true, fit: 'cover' });
+  const exported = makeExhibition([work, { ...work, id: '2', title: 'Second' }], { duration: 60, captions: false, shuffle: true, fit: 'cover', transition: 'none' });
   const imported = readExhibition(JSON.parse(JSON.stringify(exported)));
   assert.deepEqual(imported.works.map(item => item.id), ['1', '2']);
-  assert.deepEqual(imported.settings, { duration: 60, captions: false, shuffle: true, fit: 'cover' });
+  assert.deepEqual(imported.settings, { duration: 60, captions: false, shuffle: true, fit: 'cover', transition: 'none' });
 });
 test('rejects malformed imports atomically instead of silently dropping artworks', () => {
   assert.throws(() => readExhibition({ format: 'artdrops-exhibition', version: 1, works: [work, { ...work, mediaUrl: 'javascript:alert(1)', id: 'evil' }] }), /invalid/);
@@ -37,7 +37,7 @@ test('reordering handles both ends without losing or duplicating works', () => {
   assert.deepEqual(moveItem(['a', 'b', 'c'], 1, 1), ['a', 'c', 'b']);
 });
 test('untrusted settings stay within supported player values', () => {
-  assert.deepEqual(cleanSettings({ duration: -1, fit: '<script>', captions: false, shuffle: 'true' }), { duration: 30, fit: 'contain', captions: false, shuffle: false });
+  assert.deepEqual(cleanSettings({ duration: -1, fit: '<script>', captions: false, shuffle: 'true' }), { duration: 30, fit: 'contain', transition: 'fade', captions: false, shuffle: false });
   assert.equal(uniqueWorks([work, work]).length, 1);
   assert.equal(durationLabel(6, 30), '3 min loop');
 });
@@ -54,12 +54,12 @@ test('a full custom library makes room without losing any selected exhibition wo
 });
 test('one-hour mix uses 120 distinct playable works and preserves display preferences', () => {
   const works = Array.from({ length: 132 }, (_, index) => ({ ...work, id: String(index) }));
-  const settings = { duration: 120, shuffle: false, captions: false, fit: 'cover' };
+  const settings = { duration: 120, shuffle: false, captions: false, fit: 'cover', transition: 'none' };
   const mix = makeHourMix([works[0], ...works], settings);
   assert.equal(mix.works.length, 120);
   assert.equal(new Set(mix.works.map(item => item.id)).size, 120);
   assert.equal(mix.works.length * mix.settings.duration, 3600);
-  assert.deepEqual(mix.settings, { duration: 30, shuffle: true, captions: false, fit: 'cover' });
+  assert.deepEqual(mix.settings, { duration: 30, shuffle: true, captions: false, fit: 'cover', transition: 'none' });
   assert.deepEqual(readExhibition(makeExhibition(mix.works, mix.settings)), mix);
   assert.equal(settings.duration, 120);
   assert.equal(works.length, 132);
@@ -93,9 +93,9 @@ test('a larger catalog preserves portrait works past the exhibition queue limit'
   assert.equal(uniqueWorks(catalog, MAX_CATALOG_WORKS).length, 210);
   assert.equal(portraitScreenWorks(catalog).length, 60);
   assert.equal(portraitScreenWorks(catalog)[0].id, 'tall-0');
-  const mix = makePortraitMix(catalog, { duration: 30, fit: 'cover', captions: false, shuffle: false });
+  const mix = makePortraitMix(catalog, { duration: 30, fit: 'cover', transition: 'none', captions: false, shuffle: false });
   assert.equal(mix.works.length, 60);
-  assert.deepEqual(mix.settings, { duration: 60, fit: 'contain', captions: false, shuffle: true });
+  assert.deepEqual(mix.settings, { duration: 60, fit: 'contain', transition: 'none', captions: false, shuffle: true });
   assert.equal(mix.works.length * mix.settings.duration, 3600);
   assert.deepEqual(readExhibition(makeExhibition(mix.works, mix.settings)), mix);
   assert.equal(catalog.length, 210);
@@ -108,4 +108,16 @@ test('portrait mix keeps a full hour with a smaller selection and never fills wi
   assert.equal(mix.settings.duration, 120);
   assert.equal(mix.works.length * mix.settings.duration, 3600);
   assert.equal(makePortraitMix([...works.slice(0, 29), work], {}), null);
+});
+
+test('older exhibitions gain a soft fade while explicit transition choices survive backups', () => {
+  const legacy = { format: 'artdrops-exhibition', version: 1, works: [work], settings: { duration: 60, captions: false } };
+  assert.equal(readExhibition(legacy).settings.transition, 'fade');
+  for (const transition of ['fade', 'none']) {
+    const restored = readExhibition(JSON.parse(JSON.stringify(makeExhibition([work], { transition }))));
+    assert.equal(restored.settings.transition, transition);
+  }
+  for (const transition of [undefined, null, '', 'zoom', '<script>']) {
+    assert.equal(cleanSettings({ transition }).transition, 'fade');
+  }
 });

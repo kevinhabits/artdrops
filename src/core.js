@@ -1,4 +1,4 @@
-export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', captions: true, shuffle: false });
+export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', transition: 'fade', captions: true, shuffle: false });
 export const MAX_WORKS = 150;
 export const MAX_CATALOG_WORKS = 300;
 export const HOUR_MIX_SIZE = 120;
@@ -29,7 +29,8 @@ export function cleanWork(work) {
 }
 export function cleanSettings(settings = {}) {
   return { duration: [10, 20, 30, 60, 120].includes(Number(settings?.duration)) ? Number(settings.duration) : 30,
-    fit: settings?.fit === 'cover' ? 'cover' : 'contain', captions: settings?.captions !== false, shuffle: settings?.shuffle === true };
+    fit: settings?.fit === 'cover' ? 'cover' : 'contain', transition: settings?.transition === 'none' ? 'none' : 'fade',
+    captions: settings?.captions !== false, shuffle: settings?.shuffle === true };
 }
 export function filterWorks(works, { search = '', source = 'all', shape = 'all' } = {}) {
   const q = search.normalize('NFKC').toLocaleLowerCase().trim();

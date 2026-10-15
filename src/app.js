@@ -225,11 +225,12 @@ function updateQueue() {
 }
 function syncSettings() {
   $('#duration').value = settings.duration; $('#fit').value = settings.fit;
+  $('#transition').value = settings.transition;
   $('#captions').checked = settings.captions; $('#shuffle').checked = settings.shuffle;
 }
-for (const id of ['duration', 'fit', 'captions', 'shuffle']) {
+for (const id of ['duration', 'fit', 'transition', 'captions', 'shuffle']) {
   $(`#${id}`).addEventListener('change', () => {
-    settings = cleanSettings({ duration: $('#duration').value, fit: $('#fit').value, captions: $('#captions').checked, shuffle: $('#shuffle').checked });
+    settings = cleanSettings({ duration: $('#duration').value, fit: $('#fit').value, transition: $('#transition').value, captions: $('#captions').checked, shuffle: $('#shuffle').checked });
     updateQueue(); persist();
   });
 }

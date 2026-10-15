@@ -24,7 +24,7 @@ npm start     # Serves the production build locally
 
 1. Connect the laptop to the display. For the Samsung Follow Me Pro 43″ in portrait, rotate the computer's output 90° or 270° and select **2160 × 3840 at 60 Hz** when supported. Move this browser window to that display. See the [portrait display guide](docs/samsung-portrait.md).
 2. Keep **Mix for → Portrait screen · 9:16** and choose **Build a 1-hour mix** for upright works with shuffle enabled. The mix note shows the number of works and time per work. **All artwork** retains the original 120-work / 30-second mix. Or make your own selection and choose 10–120 seconds per work. A new browser starts with six portrait works from different artists; existing saved queues stay intact until you replace them. The mix button offers Undo.
-3. Choose **Show full artwork** to preserve the composition, or **Fill screen** to crop to the display. Artist captions and shuffle are optional.
+3. Choose **Show full artwork** to preserve the composition, or **Fill screen** to crop to the display. **Between artworks → Soft fade · 1.5 seconds** gently blends each work into the next; **No transition** switches instantly. Soft fade is the default, including for older saved exhibitions. Artist captions and shuffle are optional.
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Close or Escape leaves the player; some browsers use the first Escape to leave fullscreen.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
@@ -34,7 +34,7 @@ For a four-hour event, start the one-hour mix and leave it running. Every work a
 
 ## Your exhibition
 
-The queue and settings save locally in this browser. **Export exhibition** downloads a JSON backup you can import on another computer. Export contains links and credits, not the artwork files. Removing a work or importing an exhibition offers Undo.
+The queue and settings, including transitions, save locally in this browser. **Export exhibition** downloads a JSON backup you can import on another computer. Export contains links and credits, not the artwork files. Removing a work or importing an exhibition offers Undo.
 
 **Add your own** accepts a direct, public HTTPS MP4 or WebM URL and verifies that the browser decodes a video frame. YouTube pages, marketplace pages, still images, and arbitrary HTML embeds are not video files. Imported external links are rendered only inside native video elements; remote scripts are never embedded.
 
@@ -42,7 +42,7 @@ The queue and settings save locally in this browser. **Export exhibition** downl
 
 The versioned catalog lives in `public/catalog.json`. See [catalog selection and verification](docs/catalog.md) for sources and checks. Catalog data is a checked snapshot, not a live sales ranking. Discovery does not require a marketplace API to be available at page load. Art still streams from external hosts, whose availability can change.
 
-The player preloads the next work, crossfades only after actual playback starts, retries an alternate URL when present, and skips failed or stalled works. If every work fails, it stops with a clear message rather than spinning through an endless queue. On the collection page, a maximum of four visible previews animate at once; reduced-motion users get still identification previews until they explicitly start playback.
+The player preloads the next work and begins the soft fade only when it is ready to display. The outgoing artwork stays visible while the next one loads. Fades overlap the artwork slots, so they do not add time to the one-hour program. The system’s reduced-motion preference disables fades. The player retries an alternate URL when present and skips failed or stalled works. If every work fails, it stops with a clear message rather than spinning through an endless queue. On the collection page, a maximum of four visible previews animate at once; reduced-motion users get still identification previews until they explicitly start playback.
 
 Artwork titles and artist credits come from the source platforms. ArtDrops does not own or sell the artwork. Public display permissions are artwork-specific; consult each source or artist before a public exhibition. The repository includes metadata and links, not copies of the original artwork.
 

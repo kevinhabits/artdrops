@@ -22,13 +22,13 @@ npm start     # Serves the production build locally
 
 ## Put on a show
 
-1. Connect the laptop to the display. Select 3840 × 2160 in the computer's display settings if supported, and move this browser window to the external display.
-2. Choose **Build a 1-hour mix** for 120 different works, 30 seconds each, with shuffle enabled. Or make your own selection, reorder with the arrows, and choose 10–120 seconds per work. The initial six works are from different artists; the mix button replaces your selection and offers Undo.
+1. Connect the laptop to the display. For the Samsung Follow Me Pro 43″ in portrait, rotate the computer's output 90° or 270° and select **2160 × 3840 at 60 Hz** when supported. Move this browser window to that display. See the [portrait display guide](docs/samsung-portrait.md).
+2. Keep **Mix for → Portrait screen · 9:16** and choose **Build a 1-hour mix** for upright works with shuffle enabled. The mix note shows the number of works and time per work. **All artwork** retains the original 120-work / 30-second mix. Or make your own selection and choose 10–120 seconds per work. A new browser starts with six portrait works from different artists; existing saved queues stay intact until you replace them. The mix button offers Undo.
 3. Choose **Show full artwork** to preserve the composition, or **Fill screen** to crop to the display. Artist captions and shuffle are optional.
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Close or Escape leaves the player; some browsers use the first Escape to leave fullscreen.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
-Art plays silently and loops. Playback uses the source video's available resolution; a 4K display does not make a lower-resolution original 4K.
+Art plays silently and loops. **9:16 screen** filters for videos at least 1080 × 1920 that cover at least 90% of the portrait display without cropping. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show actual decoded dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
 
 For a four-hour event, start the one-hour mix and leave it running. Every work appears once per pass, then the next pass uses a fresh shuffle with no immediate repeat at the boundary. The exhibition continues until you stop it; there is no four-hour cutoff. Loading delays, pauses, and unavailable works can change the wall-clock length of a pass.
 

@@ -1,5 +1,5 @@
 import { ExhibitionPlayer } from './player.js';
-import { DEFAULT_SETTINGS, MAX_WORKS, HOUR_MIX_SIZE, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, readExhibition, durationLabel, safeUrl } from './core.js';
+import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, readExhibition, durationLabel, safeUrl } from './core.js';
 
 const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = 'artdrops:exhibition:v1';
@@ -167,14 +167,16 @@ function renderLibrary() {
   const grid = $('#art-grid');
   grid.querySelectorAll('video').forEach(unloadVideo); grid.replaceChildren();
   const works = filterWorks(allWorks(), currentFilters());
-  $('#results-count').textContent = `${works.length} ${works.length === 1 ? 'work' : 'works'} · Motion only`;
+  const portraitView = ['screen-portrait', 'portrait'].includes($('#shape-filter').value);
+  grid.classList.toggle('portrait-grid', portraitView);
+  $('#results-count').textContent = `${works.length} ${works.length === 1 ? 'work' : 'works'} · ${$('#shape-filter').value === 'screen-portrait' ? 'For your 9:16 screen' : 'Motion only'}`;
   $('#empty-state').hidden = works.length > 0 || !loaded;
   $('#load-more').hidden = works.length <= visibleCount;
   $('#load-more').textContent = `Show ${Math.min(PAGE_SIZE, works.length - visibleCount)} more works ↓`;
   works.slice(0, visibleCount).forEach(work => {
     const card = element('article', 'art-card'); card.dataset.workId = work.id;
     const visual = element('div', 'art-visual'); previewVideo(work, visual);
-    const videoTag = element('span', 'video-tag', 'MOVING ART');
+    const videoTag = element('span', 'video-tag', isPortraitScreenWork(work) ? (work.width >= 2160 && work.height >= 3840 ? '4K PORTRAIT' : 'PORTRAIT FIT') : 'MOVING ART');
     const preview = element('button', 'preview-button'); preview.setAttribute('aria-label', `Preview ${work.title} by ${work.artist}`);
     const circle = element('span', 'preview-play'); circle.append(element('span', 'play-icon')); preview.append(circle);
     preview.addEventListener('click', () => play([work])); visual.append(videoTag, preview);
@@ -184,6 +186,7 @@ function renderLibrary() {
     const source = element(work.sourceUrl ? 'a' : 'span', 'art-source', `${work.source}${work.sourceUrl ? ' ↗' : ''}`);
     if (work.sourceUrl) { source.href = work.sourceUrl; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.setAttribute('aria-label', `View ${work.title} on ${work.source}`); }
     caption.append(title, artist, source);
+    if (work.width && work.height) caption.append(element('span', 'art-dimensions', `${work.width} × ${work.height}`));
     const add = element('button', 'add-button', '+'); add.dataset.id = work.id; add.dataset.title = work.title;
     add.addEventListener('click', () => toggleWork(work));
     info.append(caption, add); card.append(visual, info); grid.append(card);
@@ -231,8 +234,16 @@ for (const id of ['duration', 'fit', 'captions', 'shuffle']) {
   });
 }
 $('#clear-queue').addEventListener('click', () => { const previous = [...queue]; queue = []; updateQueue(); persist(); notify('Exhibition cleared.', () => { queue = previous; updateQueue(); persist(); }); });
+function selectedMix() { return $('#mix-format').value === 'portrait' ? makePortraitMix(catalog, settings) : makeHourMix(catalog, settings); }
+function syncMix() {
+  const mix = selectedMix(), portrait = $('#mix-format').value === 'portrait';
+  $('#hour-mix').disabled = !mix;
+  $('#hour-mix-note').textContent = mix ? `${mix.works.length} works · ${mix.settings.duration === 30 ? '30 seconds' : `${mix.settings.duration / 60} minute${mix.settings.duration > 60 ? 's' : ''}`} each · fresh shuffle every loop` : (loaded ? 'This mix is temporarily unavailable.' : 'Loading your selection…');
+  $('#mix-screen-note').hidden = !portrait;
+}
+$('#mix-format').addEventListener('change', syncMix);
 $('#hour-mix').addEventListener('click', () => {
-  const mix = makeHourMix(catalog, settings);
+  const mix = selectedMix();
   if (!mix) return;
   const previous = { queue, settings };
   queue = mix.works; settings = mix.settings;
@@ -328,13 +339,13 @@ async function loadCatalog() {
     if (!response.ok) throw new Error('Catalog unavailable');
     const result = await response.json();
     if (result.version !== 1 || !Array.isArray(result.works)) throw new Error('Invalid catalog');
-    const works = uniqueWorks(result.works); if (!works.length) throw new Error('Empty catalog');
+    const works = uniqueWorks(result.works, MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
     catalog = works; loaded = true;
-    $('#hour-mix').disabled = catalog.length < HOUR_MIX_SIZE;
+    syncMix();
     const fresh = new Map(catalog.map(work => [work.id, work])); queue = queue.map(work => fresh.get(work.id) || work);
     if (!saved && !queue.length) {
       const artists = new Set();
-      queue = catalog.filter(work => !artists.has(work.artistKey) && artists.add(work.artistKey)).slice(0, 6);
+      queue = portraitScreenWorks(catalog).filter(work => !artists.has(work.artistKey) && artists.add(work.artistKey)).slice(0, 6);
       persist();
     }
     const artists = new Set(catalog.map(work => work.artistKey)).size, sources = new Set(catalog.map(work => work.source)).size;

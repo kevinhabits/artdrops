@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanWork, cleanSettings, filterWorks, moveItem, makeExhibition, makeHourMix, readExhibition, safeUrl, uniqueWorks, rememberCustomWork, MAX_WORKS, durationLabel } from '../src/core.js';
+import { cleanWork, cleanSettings, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, portraitCoverage, readExhibition, safeUrl, uniqueWorks, rememberCustomWork, MAX_WORKS, MAX_CATALOG_WORKS, durationLabel } from '../src/core.js';
 const work = { id: '1', title: 'Moving Colors', artist: 'A Person', kind: 'video', mediaUrl: 'https://example.com/art.mp4', width: 1920, height: 1080, source: 'objkt', sourceUrl: 'https://objkt.com/tokens/1' };
 test('import/export preserves order and display preferences', () => {
   const exported = makeExhibition([work, { ...work, id: '2', title: 'Second' }], { duration: 60, captions: false, shuffle: true, fit: 'cover' });
@@ -70,4 +70,42 @@ test('long exhibition durations stay readable', () => {
   assert.equal(durationLabel(120, 30), '1 hr loop');
   assert.equal(durationLabel(132, 30), '1 hr 6 min loop');
   assert.equal(durationLabel(120, 120), '4 hr loop');
+});
+test('portrait screen selection requires high-resolution art with at least 90% uncropped coverage', () => {
+  for (const [width, height] of [[1080, 1920], [2160, 3840], [1200, 1920], [1440, 2560]]) {
+    assert.equal(isPortraitScreenWork({ ...work, width, height }), true);
+  }
+  for (const [width, height] of [[720, 1280], [1080, 1350], [2160, 2160], [1920, 1080], [1080, 2400], [1201, 1920], [Infinity, 3840], [2160, NaN]]) {
+    assert.equal(isPortraitScreenWork({ ...work, width, height }), false);
+  }
+  assert.equal(isPortraitScreenWork(null), false);
+  assert.equal(portraitCoverage({ width: 2160, height: 3840 }), 1);
+  assert.ok(Math.abs(portraitCoverage({ width: 1200, height: 1920 }) - 0.9) < 1e-9);
+  const portrait = cleanWork({ ...work, width: 2160, height: 3840 });
+  assert.deepEqual(filterWorks([cleanWork(work), portrait], { shape: 'screen-portrait', source: 'objkt' }), [portrait]);
+});
+test('a larger catalog preserves portrait works past the exhibition queue limit', () => {
+  const landscape = Array.from({ length: 150 }, (_, i) => ({ ...work, id: `wide-${i}` }));
+  const portraits = Array.from({ length: 60 }, (_, i) => ({ ...work, id: `tall-${i}`, width: 1080, height: 1920 }));
+  portraits[0] = { ...portraits[0], width: 2160, height: 3840 };
+  const catalog = [...landscape, ...portraits];
+  assert.equal(uniqueWorks(catalog).length, 150);
+  assert.equal(uniqueWorks(catalog, MAX_CATALOG_WORKS).length, 210);
+  assert.equal(portraitScreenWorks(catalog).length, 60);
+  assert.equal(portraitScreenWorks(catalog)[0].id, 'tall-0');
+  const mix = makePortraitMix(catalog, { duration: 30, fit: 'cover', captions: false, shuffle: false });
+  assert.equal(mix.works.length, 60);
+  assert.deepEqual(mix.settings, { duration: 60, fit: 'contain', captions: false, shuffle: true });
+  assert.equal(mix.works.length * mix.settings.duration, 3600);
+  assert.deepEqual(readExhibition(makeExhibition(mix.works, mix.settings)), mix);
+  assert.equal(catalog.length, 210);
+  assert.throws(() => readExhibition({ ...makeExhibition([], {}), works: catalog }), /up to 150/);
+});
+test('portrait mix keeps a full hour with a smaller selection and never fills with landscape works', () => {
+  const works = Array.from({ length: 40 }, (_, i) => ({ ...work, id: String(i), width: 1080, height: 1920 }));
+  const mix = makePortraitMix(works, {});
+  assert.equal(mix.works.length, 30);
+  assert.equal(mix.settings.duration, 120);
+  assert.equal(mix.works.length * mix.settings.duration, 3600);
+  assert.equal(makePortraitMix([...works.slice(0, 29), work], {}), null);
 });

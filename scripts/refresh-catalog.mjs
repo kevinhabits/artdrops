@@ -4,12 +4,13 @@ import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { isPortraitScreenWork } from '../src/core.js';
 
 const catalogPath = fileURLToPath(new URL('../public/catalog.json', import.meta.url));
 
 export function validateCatalog(catalog) {
-  if (catalog?.version !== 1 || !Array.isArray(catalog.works) || catalog.works.length < 120 || catalog.works.length > 150) {
-    throw new Error('Refusing an empty or incomplete catalog (120–150 selected works required).');
+  if (catalog?.version !== 1 || !Array.isArray(catalog.works) || catalog.works.length < 120 || catalog.works.length > 300) {
+    throw new Error('Refusing an empty or incomplete catalog (120–300 selected works required).');
   }
   const ids = new Set();
   const media = new Set();
@@ -36,7 +37,9 @@ export function validateCatalog(catalog) {
     if (new URL(work.sourceUrl).hostname !== sourceHost) throw new Error(`${work.id}: incorrect source attribution`);
   }
   if (artists.size < 60) throw new Error('The selection must represent at least 60 distinct artists.');
-  return { works: ids.size, artists: artists.size };
+  const portraitWorks = catalog.works.filter(isPortraitScreenWork).length;
+  if (portraitWorks < 60) throw new Error('The selection must contain at least 60 works suitable for the portrait screen.');
+  return { works: ids.size, artists: artists.size, portraitWorks };
 }
 
 async function checkUrl(url, expectedType, useRange = false) {
@@ -96,7 +99,10 @@ function sampleMotion(url, start = 0) {
       if (code !== 0) return reject(new Error(`FFmpeg failed (${code}): ${diagnostic.slice(-400)}`));
       const hashes = [...output.matchAll(/^0,.*?,\s*([a-f0-9]{32})$/gm)].map(match => match[1]);
       const dimensions = diagnostic.match(/Video: .*?, (\d{2,5})x(\d{2,5})(?:\D|$)/);
-      resolveSample({ changing: new Set(hashes).size > 1, width: Number(dimensions?.[1]), height: Number(dimensions?.[2]) });
+      const stream = diagnostic.split('\n').find(line => line.includes('Video:')) ?? '';
+      const codec = stream.match(/Video:\s*(\w+)/)?.[1];
+      const pixelFormat = stream.match(/\b(yuv[a-z0-9]+|gbr[a-z0-9]+)\b/)?.[1];
+      resolveSample({ changing: new Set(hashes).size > 1, width: Number(dimensions?.[1]), height: Number(dimensions?.[2]), codec, pixelFormat });
     });
   });
 }
@@ -124,6 +130,7 @@ async function main() {
           if (!sample.changing) sample = await sampleMotion(work.mediaUrl, 8);
           if (!sample.changing) throw new Error('No changing frames in sampled video.');
           if (sample.width !== work.width || sample.height !== work.height) throw new Error('Decoded dimensions differ from the catalog; review the artwork.');
+          if (isPortraitScreenWork(work) && (sample.codec !== 'h264' || !['yuv420p', 'yuvj420p'].includes(sample.pixelFormat))) throw new Error('Portrait program requires 8-bit H.264 4:2:0 for browser playback.');
         }
         console.log(`OK ${work.artist} — ${work.title}`);
       } catch (error) {

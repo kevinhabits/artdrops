@@ -4,9 +4,9 @@ Checked on 2026-10-15.
 
 ## Automated and media checks
 
-- 27 Node tests pass: catalog diversity and attribution, media/input validation, filter composition, queue reordering, portable import/export, custom-library retention, one-hour mix construction, shuffle, failed-work quarantine, pause timing, stale asynchronous callbacks, paused navigation, and fullscreen ownership.
+- 31 Node tests pass: catalog diversity and attribution, portrait resolution/coverage thresholds, larger-catalog retention, media/input validation, filter composition, queue reordering, portable import/export, custom-library retention, one-hour mix construction, shuffle, failed-work quarantine, pause timing, stale asynchronous callbacks, paused navigation, and fullscreen ownership.
 - `npm run build` produces a static site with no runtime dependencies.
-- All 122 selected videos passed source-page, poster, MP4-signature, native-dimension, and decoded temporal-frame checks. There are 87 artist identities across objkt and Verse, with at most two works per artist. All 86 additions use H.264 MP4. See `catalog.md` for the method and maintenance command.
+- All 167 selected videos passed source-page, poster, MP4-signature, native-dimension, and decoded temporal-frame checks. There are 123 artist identities across objkt and Verse, with at most two works per artist. The portrait selection contains 60 works by 53 artists, including 18 native 2160 × 3840 works. See `catalog.md` for the method and maintenance command.
 - Accelerated playback simulations cover four 120-work cycles at 30 seconds per work, both with every work available and with 12 additional unavailable works. They verify each healthy work appears once per cycle, no immediate repeat across a cycle boundary, failed works stay skipped, and only two video elements are reused. A regression test covers continuing playback when only one healthy work remains.
 - No source artwork binaries, credentials, API keys, or generated build files are included in Git.
 
@@ -20,6 +20,8 @@ Tested in the Codex browser:
 - Actual decoded video playback, preloading of the next work, pause, and navigation while paused.
 - Artist search, adding to the exhibition, changing order, and settings/queue persistence across reload.
 - Building the one-hour mix produces 120 works, 30-second slots, shuffle enabled, and focus on Start exhibition. Undo restores the previous queue and settings; the full mix persists across reload. A newly added artwork decodes and plays with the next work preloaded.
+- The portrait preset produces 60 matching works at 60 seconds each, enables shuffle, and overrides crop mode with `contain`. Undo restores the previous queue and crop preference; the portrait queue/settings persist across reload. The default 9:16 filter returns all 60 works, including additions beyond the old 150-work catalog limit.
+- A native 2160 × 3840 portrait source decodes and plays in a 2160 × 3840 player/video box with `object-fit: contain`. These are browser geometry and playback checks; the physical Samsung screen was not connected. The embedded browser's large-viewport screenshot capture clips/stitches the canvas, so it is not used as proof of physical-display output.
 - Importing a portable exhibition through its file picker.
 - A deliberately unavailable video followed by two valid artworks: playback skipped the broken work and continued.
 - An exhibition containing only the unavailable work: playback stopped with an actionable message and retained an exit control.

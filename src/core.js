@@ -1,5 +1,6 @@
 export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', captions: true, shuffle: false });
 export const MAX_WORKS = 150;
+export const MAX_CATALOG_WORKS = 300;
 export const HOUR_MIX_SIZE = 120;
 export function safeUrl(value) {
   try {
@@ -32,7 +33,7 @@ export function cleanSettings(settings = {}) {
 }
 export function filterWorks(works, { search = '', source = 'all', shape = 'all' } = {}) {
   const q = search.normalize('NFKC').toLocaleLowerCase().trim();
-  return works.filter(work => (source === 'all' || work.source === source) && (shape === 'all' || work.orientation === shape) && (!q || `${work.title} ${work.artist}`.normalize('NFKC').toLocaleLowerCase().includes(q)));
+  return works.filter(work => (source === 'all' || work.source === source) && (shape === 'all' || (shape === 'screen-portrait' ? isPortraitScreenWork(work) : work.orientation === shape)) && (!q || `${work.title} ${work.artist}`.normalize('NFKC').toLocaleLowerCase().includes(q)));
 }
 export function moveItem(items, index, offset) {
   const next = [...items]; const target = index + offset;
@@ -40,9 +41,9 @@ export function moveItem(items, index, offset) {
   [next[index], next[target]] = [next[target], next[index]];
   return next;
 }
-export function uniqueWorks(works) {
+export function uniqueWorks(works, limit = MAX_WORKS) {
   const seen = new Set();
-  return works.map(cleanWork).filter(work => work && !seen.has(work.id) && seen.add(work.id)).slice(0, MAX_WORKS);
+  return works.map(cleanWork).filter(work => work && !seen.has(work.id) && seen.add(work.id)).slice(0, limit);
 }
 export function rememberCustomWork(custom, work, queue) {
   const selected = new Set(queue.map(item => item.id));
@@ -61,6 +62,26 @@ export function makeHourMix(works, settings) {
   const selected = uniqueWorks(works).slice(0, HOUR_MIX_SIZE);
   if (selected.length < HOUR_MIX_SIZE) return null;
   return { works: selected, settings: cleanSettings({ ...settings, duration: 30, shuffle: true }) };
+}
+export function portraitCoverage(work) {
+  if (!work) return 0;
+  const width = Number(work.width), height = Number(work.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return 0;
+  const ratio = (width / height) / (9 / 16);
+  return Math.min(ratio, 1 / ratio);
+}
+export function isPortraitScreenWork(work) {
+  return Boolean(work && work.width >= 1080 && work.height >= 1920 && portraitCoverage(work) + 1e-9 >= 0.9);
+}
+export function portraitScreenWorks(works) {
+  return uniqueWorks(works, MAX_CATALOG_WORKS).filter(isPortraitScreenWork).sort((a, b) =>
+    portraitCoverage(b) - portraitCoverage(a) || b.width * b.height - a.width * a.height);
+}
+export function makePortraitMix(works, settings) {
+  const candidates = portraitScreenWorks(works);
+  const count = candidates.length >= 60 ? 60 : 30;
+  if (candidates.length < count) return null;
+  return { works: candidates.slice(0, count), settings: cleanSettings({ ...settings, duration: 3600 / count, shuffle: true, fit: 'contain' }) };
 }
 export function durationLabel(count, seconds) {
   const total = count * seconds;

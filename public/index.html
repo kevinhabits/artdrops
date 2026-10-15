@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="description" content="Moving art. Thoughtfully selected. Build a personal exhibition of animated digital art and bring it to the big screen.">
+  <meta property="og:title" content="ArtDrops — A little space for moving art">
+  <meta property="og:description" content="Discover moving art. Make an exhibition. Give it the whole screen.">
+  <meta property="og:type" content="website">
+  <title>ArtDrops — A little space for moving art</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/src/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#collection">Skip to collection</a>
+  <header class="site-header shell">
+    <a class="wordmark" href="/" aria-label="ArtDrops home"><img src="/favicon.svg" alt="" width="31" height="31">artdrops</a>
+    <nav aria-label="Main navigation"><a class="nav-active" href="#collection">Collection</a><a href="#exhibition">My exhibition <span id="nav-count" class="count">0</span></a></nav>
+    <button class="guide-button text-button" id="guide-open"><span class="display-icon" aria-hidden="true"></span><span>Display guide</span></button>
+  </header>
+  <main class="shell">
+    <section class="intro" aria-labelledby="intro-title">
+      <div class="intro-copy">
+        <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> A LITTLE SPACE FOR MOVING ART</p>
+        <h1 id="intro-title">Good art.<br>Always <em>in motion.</em></h1>
+        <p class="intro-description">Discover something that moves you.<br>Make it an exhibition. Give it the whole screen.</p>
+        <div class="intro-actions"><button class="button button-dark" id="hero-play"><span class="play-icon" aria-hidden="true"></span>Play exhibition</button><a class="text-link" href="#collection">Explore the collection <span aria-hidden="true">↗</span></a></div>
+        <p class="quiet-note">No account. Just art, and a little time.</p>
+      </div>
+      <div class="featured" id="featured"><div class="art-loading"><span class="loading-orbit"></span><span>Opening the collection</span></div></div>
+    </section>
+    <section class="collection-section" id="collection" aria-labelledby="collection-title">
+      <div class="section-heading"><div><p class="eyebrow">THE COLLECTION / 001</p><h2 id="collection-title">Stay for a while.</h2></div><p class="collection-stats" id="collection-stats" aria-live="polite">Loading moving art…</p></div>
+      <div class="workspace">
+        <div class="library">
+          <div class="toolbar">
+            <label class="search-field"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find an artwork or artist" aria-label="Find an artwork or artist" autocomplete="off"></label>
+            <label class="sr-only" for="source-filter">Marketplace</label><select id="source-filter"><option value="all">All sources</option></select>
+            <label class="sr-only" for="shape-filter">Artwork shape</label><select id="shape-filter"><option value="all">All shapes</option><option value="landscape">Landscape</option><option value="square">Square</option><option value="portrait">Portrait</option></select>
+          </div>
+          <div class="library-meta"><p id="results-count">Motion only. Every frame belongs here.</p><button class="text-button" id="add-link-open"><span aria-hidden="true">＋</span> Add your own</button></div>
+          <div class="art-grid" id="art-grid" aria-live="polite" aria-busy="true"></div>
+          <div class="empty-state" id="empty-state" hidden><span class="empty-mark" aria-hidden="true">↗</span><h3>A little too specific.</h3><p>Try another artist, source, or shape.</p><button id="reset-filters" class="button button-light">Reset filters</button></div>
+          <button id="load-more" class="button button-light load-more" hidden>More moving art <span aria-hidden="true">↓</span></button>
+          <div id="catalog-error" class="empty-state" hidden><h3>The collection couldn’t load.</h3><p>Your saved exhibition is still here. Reconnect and try again.</p><button id="retry-catalog" class="button button-dark">Try again</button></div>
+        </div>
+        <aside class="exhibition-panel" id="exhibition" aria-labelledby="exhibition-title">
+          <div class="panel-heading"><div><p class="eyebrow">MADE BY YOU</p><h2 id="exhibition-title">Your exhibition<span class="accent-dot">.</span></h2></div><span class="count" id="queue-count">0</span></div>
+          <div class="queue-summary"><span id="queue-summary">Start with a few favorites</span><button class="text-button" id="clear-queue">Clear</button></div>
+          <ol class="queue-list" id="queue-list" aria-label="Exhibition order"></ol>
+          <div class="queue-empty" id="queue-empty" hidden><span aria-hidden="true">＋</span><p>A space for your favorites.</p><small>Add works from the collection to begin.</small></div>
+          <div class="show-settings">
+            <div class="setting-row"><label for="duration">Time with each work</label><select id="duration"><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30" selected>30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option></select></div>
+            <div class="setting-row"><label for="fit">On your screen</label><select id="fit"><option value="contain">Show full artwork</option><option value="cover">Fill screen · crops edges</option></select></div>
+            <label class="setting-row switch-row"><span>Artist captions</span><input type="checkbox" id="captions" checked role="switch"><span class="switch" aria-hidden="true"></span></label>
+            <label class="setting-row switch-row"><span>Shuffle the order</span><input type="checkbox" id="shuffle" role="switch"><span class="switch" aria-hidden="true"></span></label>
+          </div>
+          <button class="button button-accent start-show" id="start-show"><span class="play-icon" aria-hidden="true"></span>Start exhibition <span aria-hidden="true">↗</span></button>
+          <p class="save-note" id="save-note"><span class="tiny-dot" aria-hidden="true"></span>Saved on this browser</p>
+          <div class="backup-actions"><button class="text-button" id="export-queue">Export exhibition</button><span aria-hidden="true">·</span><button class="text-button" id="import-queue">Import</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
+        </aside>
+      </div>
+    </section>
+    <section class="closing-note"><span class="closing-mark" aria-hidden="true">✳</span><p>A moment for moving art.<br><em>A reason to look a little longer.</em></p><a href="#collection" aria-label="Back to collection">↑</a></section>
+  </main>
+  <footer class="site-footer shell"><span>artdrops <span class="footer-separator">/</span> A living collection.</span><span>Artwork belongs to its artists. <button class="text-button" id="about-open">About this collection ↗</button></span></footer>
+  <dialog id="guide-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close display guide">×</button><p class="eyebrow">THE BIG SCREEN</p><h2>Set the room in motion.</h2><p>Connect your laptop to your Samsung display, then move this browser window onto that screen.</p><ol class="guide-steps"><li><strong>Give it all the pixels.</strong><span>Choose 3840 × 2160 in your computer’s display settings when supported. Artwork plays at its available source resolution.</span></li><li><strong>Make your selection.</strong><span>Add works, adjust the order, and choose the time with each piece. “Show full artwork” preserves the original composition.</span></li><li><strong>Press play. Settle in.</strong><span>Start the exhibition and press F for fullscreen. Keep the laptop plugged in and disable system sleep for a long show. An internet connection is needed for artwork playback.</span></li></ol><div class="keyboard-guide"><span><kbd>←</kbd><kbd>→</kbd> Change work</span><span><kbd>Space</kbd> Pause</span><span><kbd>F</kbd> Fullscreen</span><span><kbd>Esc</kbd> Leave show</span></div><p class="dialog-footnote">Playback is silent. Your exhibition repeats until you close it.</p></dialog>
+  <dialog id="about-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close collection information">×</button><p class="eyebrow">A NOTE ON THE COLLECTION</p><h2>Artists first. Motion always.</h2><p>This is a saved selection of moving artworks from public marketplace catalogs, chosen for variety and playable media. It’s an introduction to the artists, not a sales ranking.</p><p>Every work links to its source. The art streams from its original host; ArtDrops does not own or sell it. A checked link can still become unavailable, so the player skips failed works and keeps the show going.</p><p id="catalog-updated"></p><p class="dialog-footnote">Public exhibition permissions depend on the artwork and artist. Check the source or contact the artist before including their work in your public show.</p></dialog>
+  <dialog id="add-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close add artwork">×</button><p class="eyebrow">MAKE IT PERSONAL</p><h2>Bring your own motion.</h2><p>Add a direct MP4 or WebM link. We’ll check that it plays before adding it to your exhibition.</p><form id="add-form"><label>Artwork title<input name="title" required maxlength="160" placeholder="Give this work a name"></label><label>Artist<input name="artist" required maxlength="120" placeholder="Credit the artist"></label><label>Video URL<input name="url" type="url" required placeholder="https://…/artwork.mp4"></label><p class="field-help">Use the video file’s URL, rather than a marketplace or YouTube page.</p><p id="add-error" class="form-error" role="alert" hidden></p><button class="button button-accent" type="submit" id="add-submit">Check & add artwork <span aria-hidden="true">↗</span></button></form></dialog>
+  <div class="toast" id="toast" role="status" hidden><span id="toast-message"></span><button id="toast-undo" hidden>Undo</button><button id="toast-close" aria-label="Dismiss notification">×</button></div>
+  <noscript><div class="noscript">ArtDrops needs JavaScript to play artworks and save your exhibition. Please enable it and reload.</div></noscript>
+</body>
+</html>

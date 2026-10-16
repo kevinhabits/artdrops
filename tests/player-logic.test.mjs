@@ -125,21 +125,24 @@ test('manual navigation while paused promotes a decoded first frame without star
   assert.equal(promotions, 1);
 });
 
-test('fullscreen targets the document and exits only fullscreen acquired by the player', async () => {
+test('fullscreen targets the player surface and exits only fullscreen acquired by the player', async () => {
   const original = globalThis.document;
   const fake = { fullscreenElement: null, documentElement: {}, exits: 0 };
-  fake.documentElement.requestFullscreen = async () => { fake.fullscreenElement = fake.documentElement; };
+  const surface = { requestFullscreen: async () => { fake.fullscreenElement = surface; } };
   fake.exitFullscreen = async () => { fake.exits++; fake.fullscreenElement = null; };
   globalThis.document = fake;
   try {
     const player = new ExhibitionPlayer();
     player.opened = true;
     player.session = 1;
+    player.surface = surface;
     await player.enterFullscreen();
-    assert.equal(fake.fullscreenElement, fake.documentElement);
+    assert.equal(fake.fullscreenElement, surface);
     assert.equal(player.fullscreenOwned, true);
     player.releaseFullscreen();
     assert.equal(fake.exits, 1);
+    await Promise.resolve();
+    await Promise.resolve();
 
     fake.fullscreenElement = fake.documentElement;
     await player.enterFullscreen();
@@ -157,15 +160,16 @@ test('a fullscreen request that completes after close releases its acquired full
   const original = globalThis.document;
   let complete;
   const fake = { fullscreenElement: null, documentElement: {}, exits: 0 };
-  fake.documentElement.requestFullscreen = () => new Promise((resolve) => {
-    complete = () => { fake.fullscreenElement = fake.documentElement; resolve(); };
-  });
+  const surface = { requestFullscreen: () => new Promise((resolve) => {
+    complete = () => { fake.fullscreenElement = surface; resolve(); };
+  }) };
   fake.exitFullscreen = async () => { fake.exits++; fake.fullscreenElement = null; };
   globalThis.document = fake;
   try {
     const player = new ExhibitionPlayer();
     player.opened = true;
     player.session = 1;
+    player.surface = surface;
     const pending = player.enterFullscreen();
     player.releaseFullscreen();
     player.opened = false;

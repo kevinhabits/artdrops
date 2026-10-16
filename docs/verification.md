@@ -1,10 +1,10 @@
 # Release verification
 
-Transition release checked on 2026-10-16. Catalog/media and physical-resolution browser checks below were completed on 2026-10-15.
+Start/fullscreen reliability and transition releases checked on 2026-10-16. Catalog/media and physical-resolution browser checks below were completed on 2026-10-15.
 
 ## Automated and media checks
 
-- 40 Node tests pass: catalog diversity and attribution, portrait resolution/coverage thresholds, larger-catalog retention, media/input validation, filter composition, queue reordering, portable import/export, custom-library retention, one-hour mix construction, shuffle, failed-work quarantine, pause timing, stale asynchronous callbacks, paused navigation, fullscreen ownership, transition preference migration, fade timing, rapid navigation, stale fade callbacks, immediate/reduced-motion cleanup, and continuous single-artwork loops.
+- 57 Node tests pass: catalog diversity and attribution, portrait resolution/coverage thresholds, larger-catalog retention, media/input validation, filter composition, queue reordering, portable import/export, custom-library retention, one-hour mix construction, shuffle, failed-work quarantine, pause timing, stale asynchronous callbacks, paused navigation, fullscreen ownership, transition preference migration, fade timing, rapid navigation, stale fade callbacks, immediate/reduced-motion cleanup, and continuous single-artwork loops. New startup tests cover media-before-fullscreen ordering, the complete player surface inside its modal, synchronous and asynchronous fullscreen denial, repeated toggles, unsupported APIs, pending-request deduplication, late completion after close/reopen, and Escape/cancel. Autoplay tests cover recoverable policy refusal, same-artwork Resume, frozen clocks/watchdogs, genuine media failures, and stale playback events.
 - `npm run build` produces a static site with no runtime dependencies.
 - All 167 selected videos passed source-page, poster, MP4-signature, native-dimension, and decoded temporal-frame checks. There are 123 artist identities across objkt and Verse, with at most two works per artist. The portrait selection contains 60 works by 53 artists, including 18 native 2160 × 3840 works. See `catalog.md` for the method and maintenance command.
 - Accelerated playback simulations cover four 120-work cycles at 30 seconds per work, both with every work available and with 12 additional unavailable works. They verify each healthy work appears once per cycle, no immediate repeat across a cycle boundary, failed works stay skipped, and only two video elements are reused. A regression test covers continuing playback when only one healthy work remains.
@@ -14,6 +14,8 @@ Transition release checked on 2026-10-16. Catalog/media and physical-resolution 
 
 Tested in the Codex browser:
 
+- Start/fullscreen release: both **Start exhibition** and **Play exhibition** open the saved 60-work queue and decode moving artwork. Enter/Exit fullscreen buttons update their labels and preserve the playing video and position; the screenshot includes the artwork, captions, and controls together in fullscreen. Pause/Resume works, Close removes the player and restores focus to the corresponding launch button, and reopening starts a fresh exhibition.
+- A temporary browser test page injected one `NotAllowedError` into the first video play request. The player retained the work, showed the Resume message, and a real Resume click began **Resonant Fluidity** at 2160 × 3840. This verifies recovery from a simulated policy refusal using real media and browser events. The temporary page was removed before building/deploying.
 - Source captions checked on 2026-10-16: actual playback shows **Resonant Fluidity / Cromwell · objkt** and **Calculated Movements #5 / Larry Cuba · Verse**. Titles remain on their own line, with the artist and marketplace beneath.
 - Transition release: older saved exhibitions default to **Soft fade · 1.5 seconds**; **No transition** persists across reload. Changing other settings and building a portrait mix preserve the selected transition.
 - Actual automatic and manual fades use the incoming video above an opaque outgoing video. During a measured dissolve, the incoming layer had opacity 0.027 with a 1.5-second transition while the outgoing layer remained at opacity 1. Both video slots work as the incoming layer on successive changes.
@@ -31,7 +33,7 @@ Tested in the Codex browser:
 - A deliberately unavailable video followed by two valid artworks: playback skipped the broken work and continued.
 - An exhibition containing only the unavailable work: playback stopped with an actionable message and retained an exit control.
 
-The embedded test browser does not expose the native Fullscreen API. Its full-window player fallback was tested; requesting document fullscreen and preserving preexisting fullscreen are covered by unit tests. Native fullscreen and physical output on the Samsung monitor should be checked in the show laptop's browser.
+The current embedded browser successfully exercises the Fullscreen API and shows the complete player surface; switching automation contexts can itself leave fullscreen. Earlier API inspection incorrectly inferred no support from unavailable properties in the restricted DOM inspection scope. Unsupported and denied fullscreen paths are now covered by dedicated regression tests. Separate Google Chrome access was not approved, so standalone Chrome and the actual Samsung setup remain unverified. The fullscreen target is now a regular child containing all player UI inside the modal, avoiding the page/document being placed above the modal in the browser's top layer.
 
 ## Boundaries
 

@@ -76,6 +76,7 @@ export class ExhibitionPlayer {
     this.nextPlan = null;
     this.fadeState = null;
     this.paused = false;
+    this.needsPlayGesture = false;
     this.elapsed = 0;
     this.startedAt = null;
     this.opened = true;
@@ -90,6 +91,12 @@ export class ExhibitionPlayer {
     dialog.tabIndex = -1;
     this.dialog = dialog;
     dialog.style.setProperty('--player-fade-duration', `${this.transitionDuration()}ms`);
+    // Fullscreen a regular child of the modal. Fullscreening the page instead
+    // can put the page above the modal in the browser's top layer.
+    const surface = document.createElement('div');
+    surface.className = 'player-surface';
+    this.surface = surface;
+    dialog.append(surface);
     const stage = document.createElement('div');
     stage.className = 'player-stage';
     this.slots = [0, 1].map(() => {
@@ -112,7 +119,7 @@ export class ExhibitionPlayer {
       stage.append(video);
       return slot;
     });
-    dialog.append(stage);
+    surface.append(stage);
 
     const top = document.createElement('div');
     top.className = 'player-top player-chrome';
@@ -123,13 +130,19 @@ export class ExhibitionPlayer {
     this.counter.className = 'player-counter';
     this.counter.setAttribute('aria-label', 'Exhibition position');
     top.append(brand, this.counter);
-    dialog.append(top);
+    surface.append(top);
 
     this.message = document.createElement('div');
     this.message.className = 'player-message';
     this.message.setAttribute('role', 'status');
     this.message.textContent = 'Preparing your exhibition…';
-    dialog.append(this.message);
+    surface.append(this.message);
+
+    this.fullscreenNotice = document.createElement('p');
+    this.fullscreenNotice.className = 'player-notice player-chrome';
+    this.fullscreenNotice.setAttribute('role', 'status');
+    this.fullscreenNotice.hidden = true;
+    surface.append(this.fullscreenNotice);
 
     this.caption = document.createElement('div');
     this.caption.className = 'player-caption';
@@ -137,7 +150,7 @@ export class ExhibitionPlayer {
     this.title = document.createElement('h2');
     this.artist = document.createElement('p');
     this.caption.append(this.title, this.artist);
-    dialog.append(this.caption);
+    surface.append(this.caption);
 
     const controls = document.createElement('div');
     controls.className = 'player-controls player-chrome';
@@ -145,25 +158,26 @@ export class ExhibitionPlayer {
     controls.setAttribute('aria-label', 'Exhibition controls');
     this.pauseButton = button('Pause exhibition (Space)', 'Pause', () => this.togglePause());
     this.pauseButton.setAttribute('aria-pressed', 'false');
+    this.fullscreenButton = button('Enter fullscreen (F)', 'Fullscreen', () => this.fullscreen());
     controls.append(
       button('Previous artwork (Left arrow)', '←', () => this.advance(-1)),
       this.pauseButton,
       button('Next artwork (Right arrow)', '→', () => this.advance(1)),
-      button('Toggle fullscreen (F)', 'Fullscreen', () => this.fullscreen()),
+      this.fullscreenButton,
       button('Close exhibition (Escape)', 'Close ×', () => this.close()),
     );
-    dialog.append(controls);
+    surface.append(controls);
     this.progress = document.createElement('div');
     this.progress.className = 'player-progress';
     this.progress.setAttribute('aria-hidden', 'true');
-    dialog.append(this.progress);
+    surface.append(this.progress);
 
     const signal = this.controller.signal;
-    this.reducedMotion?.addEventListener('change', () => {
+    this.reducedMotion?.addEventListener?.('change', () => {
       dialog.style.setProperty('--player-fade-duration', `${this.transitionDuration()}ms`);
       if (this.reducedMotion.matches) this.finishTransition(true);
     }, { signal });
-    dialog.addEventListener('cancel', (event) => { event.preventDefault(); this.close(); }, { signal });
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); if (this.fullscreenElement()) this.fullscreen(); else this.close(); }, { signal });
     dialog.addEventListener('close', () => { if (this.opened) this.close(); }, { signal });
     dialog.addEventListener('pointermove', () => this.showControls(), { signal });
     dialog.addEventListener('pointerdown', () => this.showControls(), { signal });
@@ -171,7 +185,7 @@ export class ExhibitionPlayer {
     dialog.addEventListener('keydown', (event) => {
       this.showControls();
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.key === 'Escape') { event.preventDefault(); this.close(); }
+      if (event.key === 'Escape') { event.preventDefault(); if (this.fullscreenElement()) this.fullscreen(); else this.close(); }
       else if (event.key === 'ArrowLeft') { event.preventDefault(); this.advance(-1); }
       else if (event.key === 'ArrowRight') { event.preventDefault(); this.advance(1); }
       else if (event.key === ' ') {
@@ -186,21 +200,26 @@ export class ExhibitionPlayer {
         this.tick();
       }
     }, { signal });
-    document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement) {
+    const fullscreenChanged = () => {
+      if (!this.fullscreenElement()) {
         this.fullscreenOwned = false;
         if (!this.fullscreenRequest?.pending) this.fullscreenRequest = null;
       }
-    }, { signal });
+      this.syncFullscreenButton();
+    };
+    document.addEventListener('fullscreenchange', fullscreenChanged, { signal });
     document.body.append(dialog);
     dialog.showModal();
     dialog.focus();
-    this.enterFullscreen();
     this.requestWakeLock();
     this.showControls();
     this.interval = setInterval(() => this.tick(), 100);
     if (this.order.length) this.requestWork(0);
     else this.unavailable('There are no playable videos in this exhibition. Close the player and add an artwork.');
+    // Start media while the click still has user activation. Fullscreen may
+    // consume that activation, and must never be a prerequisite for playback.
+    this.syncFullscreenButton();
+    if (this.order.length) this.enterFullscreen();
   }
 
   sources(work) {
@@ -303,28 +322,48 @@ export class ExhibitionPlayer {
     }
     this.watch(slot);
     if (!this.paused) this.play(slot, pending.token);
-    else if (slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
+    else if (!this.needsPlayGesture && slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
   }
 
   play(slot, token = null) {
     const session = this.session;
     const playToken = Symbol('play');
     slot.playToken = playToken;
-    const promise = slot.video.play();
-    promise?.catch((error) => {
-      if (!this.opened || this.session !== session || slot.playToken !== playToken || this.paused || error.name === 'AbortError') return;
-      if (this.pending?.slot === slot && this.pending.token === token) this.failPending();
-      else if (this.active === slot && !this.pending) this.failActive();
-    });
+    const rejected = (error) => {
+      if (!this.opened || this.session !== session || slot.playToken !== playToken
+        || (this.paused && !this.needsPlayGesture) || error?.name === 'AbortError') return;
+      const pending = this.pending?.slot === slot && this.pending.token === token;
+      const active = this.active === slot && !this.pending;
+      if (!pending && !active) return;
+      if (error?.name === 'NotAllowedError') {
+        this.freezeClock();
+        this.needsPlayGesture = true;
+        this.paused = true;
+        for (const candidate of this.slots) { candidate.video.pause(); this.clearWatch(candidate); }
+        this.pauseButton.disabled = false;
+        this.pauseButton.textContent = 'Resume';
+        this.pauseButton.setAttribute('aria-label', 'Resume exhibition (Space)');
+        this.pauseButton.setAttribute('aria-pressed', 'true');
+        this.message.textContent = 'Your browser paused playback. Select Resume to start the artwork.';
+        this.message.hidden = false;
+        this.showControls();
+        this.tick();
+        return;
+      }
+      if (pending) this.failPending();
+      else this.failActive();
+    };
+    try { Promise.resolve(slot.video.play()).catch(rejected); }
+    catch (error) { rejected(error); }
   }
 
   watch(slot) {
     this.clearWatch(slot);
-    if (this.paused && this.pending?.slot !== slot) return;
+    if (this.needsPlayGesture || (this.paused && this.pending?.slot !== slot)) return;
     const session = this.session;
     slot.watchdog = setTimeout(() => {
       slot.watchdog = null;
-      if (!this.opened || this.session !== session || (this.paused && this.pending?.slot !== slot)) return;
+      if (!this.opened || this.session !== session || this.needsPlayGesture || (this.paused && this.pending?.slot !== slot)) return;
       if (this.pending?.slot === slot) this.failPending();
       else if (this.active === slot && !this.pending) this.failActive();
     }, LOAD_TIMEOUT);
@@ -337,7 +376,7 @@ export class ExhibitionPlayer {
 
   videoEvent(slot, event) {
     if (event === 'loadeddata') {
-      if (this.paused && this.pending?.slot === slot && slot.video.videoWidth) this.promote();
+      if (this.paused && !this.needsPlayGesture && this.pending?.slot === slot && slot.video.videoWidth) this.promote();
       return;
     }
     if (event === 'playing') {
@@ -345,6 +384,16 @@ export class ExhibitionPlayer {
         if (this.pending?.slot === slot) this.failPending();
         else if (this.active === slot && !this.pending) this.failActive();
         return;
+      }
+      if (this.needsPlayGesture) {
+        if (slot !== (this.pending?.slot || this.active) || slot.video.paused) return;
+        this.needsPlayGesture = false;
+        this.paused = false;
+        this.pauseButton.textContent = 'Pause';
+        this.pauseButton.setAttribute('aria-label', 'Pause exhibition (Space)');
+        this.pauseButton.setAttribute('aria-pressed', 'false');
+        this.message.hidden = true;
+        this.showControls();
       }
       this.clearWatch(slot);
       slot.buffering = false;
@@ -529,6 +578,12 @@ export class ExhibitionPlayer {
 
   togglePause() {
     if (!this.opened || (!this.active && !this.pending)) return;
+    if (this.needsPlayGesture) {
+      const slot = this.pending?.slot || this.active;
+      this.play(slot, this.pending?.token ?? null);
+      this.showControls();
+      return;
+    }
     this.paused = !this.paused;
     this.pauseButton.textContent = this.paused ? 'Resume' : 'Pause';
     this.pauseButton.setAttribute('aria-label', `${this.paused ? 'Resume' : 'Pause'} exhibition (Space)`);
@@ -564,55 +619,93 @@ export class ExhibitionPlayer {
     }, 2800);
   }
 
-  fullscreen() {
-    if (!this.opened) return;
-    if (document.fullscreenElement) {
-      this.fullscreenOwned = false;
-      if (this.fullscreenRequest) this.fullscreenRequest.ownerSession = null;
-      document.exitFullscreen?.().catch(() => {});
-    } else this.enterFullscreen();
+  fullscreenElement() { return document.fullscreenElement || null; }
+
+  syncFullscreenButton() {
+    if (!this.fullscreenButton) return;
+    const active = Boolean(this.fullscreenElement());
+    const supported = typeof this.surface?.requestFullscreen === 'function' && document.fullscreenEnabled !== false;
+    this.fullscreenButton.hidden = !supported && !active;
+    this.fullscreenButton.disabled = Boolean(this.fullscreenRequest?.pending || this.fullscreenExit);
+    this.fullscreenButton.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+    this.fullscreenButton.setAttribute('aria-label', `${active ? 'Exit' : 'Enter'} fullscreen (F)`);
+    this.fullscreenButton.setAttribute('aria-pressed', String(active));
+    this.fullscreenButton.title = active ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)';
   }
 
-  enterFullscreen() {
-    const element = document.documentElement;
-    // A modal dialog cannot itself be a fullscreen element. Fullscreen its
-    // document instead; the native dialog remains above it in the top layer.
-    if (document.fullscreenElement) {
-      if (this.fullscreenRequest?.pending && document.fullscreenElement === element) {
-        this.fullscreenRequest.ownerSession = this.session;
-        this.fullscreenOwned = true;
-      }
+  fullscreenUnavailable() {
+    if (!this.fullscreenNotice || !this.opened) return;
+    this.fullscreenNotice.textContent = 'Fullscreen is unavailable here. The exhibition will stay in this window.';
+    this.fullscreenNotice.hidden = false;
+    this.showControls();
+  }
+
+  fullscreen() {
+    if (!this.opened || this.fullscreenRequest?.pending || this.fullscreenExit) return;
+    if (this.fullscreenElement()) return this.exitFullscreen();
+    return this.enterFullscreen(true);
+  }
+
+  enterFullscreen(explicit = false) {
+    const element = this.surface;
+    if (!this.opened || this.fullscreenElement() || this.fullscreenRequest?.pending || this.fullscreenExit) {
+      this.syncFullscreenButton();
       return;
     }
-    if (this.fullscreenRequest?.pending) {
-      this.fullscreenRequest.ownerSession = this.session;
+    if (typeof element?.requestFullscreen !== 'function' || document.fullscreenEnabled === false) {
+      this.syncFullscreenButton();
+      if (explicit) this.fullscreenUnavailable();
       return;
     }
-    if (!element.requestFullscreen) return;
-    const request = { ownerSession: this.session, pending: true };
+    const request = { element, ownerSession: this.session, pending: true };
     this.fullscreenRequest = request;
-    return element.requestFullscreen().then(() => {
-      request.pending = false;
-      if (this.fullscreenRequest !== request) return;
-      if (this.opened && request.ownerSession === this.session) {
-        this.fullscreenOwned = document.fullscreenElement === element;
-      } else if (document.fullscreenElement === element) {
-        document.exitFullscreen?.().catch(() => {});
-      }
-    }).catch(() => {
+    this.syncFullscreenButton();
+    const failed = () => {
       if (this.fullscreenRequest === request) this.fullscreenRequest = null;
+      if (this.opened && request.ownerSession === this.session) this.fullscreenUnavailable();
+    };
+    let result;
+    try { result = element.requestFullscreen(); }
+    catch { request.pending = false; failed(); this.syncFullscreenButton(); return; }
+    return Promise.resolve(result).then(() => {
+      request.pending = false;
+      if (this.opened && request.ownerSession === this.session && this.surface === element) {
+        this.fullscreenOwned = this.fullscreenElement() === element;
+        if (this.fullscreenNotice) this.fullscreenNotice.hidden = true;
+      } else if (this.fullscreenElement() === element) {
+        // A closed or replaced player must not leave its old surface fullscreen.
+        return this.exitFullscreen();
+      }
+    }).catch(failed).finally(() => {
+      request.pending = false;
+      this.syncFullscreenButton();
+    });
+  }
+
+  exitFullscreen() {
+    if (this.fullscreenExit || !this.fullscreenElement()) return;
+    const operation = { session: this.session };
+    this.fullscreenExit = operation;
+    this.syncFullscreenButton();
+    let result;
+    try { result = document.exitFullscreen?.(); }
+    catch { result = Promise.reject(new Error('Fullscreen exit failed')); }
+    return Promise.resolve(result).catch(() => {
+      if (this.opened && operation.session === this.session) this.fullscreenUnavailable();
+    }).finally(() => {
+      if (this.fullscreenExit === operation) this.fullscreenExit = null;
+      this.syncFullscreenButton();
     });
   }
 
   releaseFullscreen() {
-    const ownsRequest = this.fullscreenRequest?.ownerSession === this.session;
-    if (ownsRequest) this.fullscreenRequest.ownerSession = null;
+    const request = this.fullscreenRequest;
+    const ownsRequest = request?.ownerSession === this.session;
+    if (ownsRequest) request.ownerSession = null;
     const owned = this.fullscreenOwned || ownsRequest;
     this.fullscreenOwned = false;
-    if (owned && document.fullscreenElement === document.documentElement) {
-      document.exitFullscreen?.().catch(() => {});
-    }
-    if (!this.fullscreenRequest?.pending) this.fullscreenRequest = null;
+    if (owned && this.fullscreenElement() === this.surface) this.exitFullscreen();
+    if (!request?.pending) this.fullscreenRequest = null;
   }
 
   async requestWakeLock() {
@@ -634,11 +727,11 @@ export class ExhibitionPlayer {
     this.releaseFullscreen();
     this.opened = false;
     this.session += 1;
-    this.controller.abort();
+    this.controller?.abort();
     clearInterval(this.interval);
     clearTimeout(this.controlsTimer);
     clearTimeout(this.fadeTimer);
-    for (const slot of this.slots) {
+    for (const slot of this.slots || []) {
       this.clearWatch(slot);
       slot.video.pause();
       slot.video.removeAttribute('src');
@@ -647,8 +740,8 @@ export class ExhibitionPlayer {
     this.wakeLock?.release().catch(() => {});
     this.wakeLock = null;
     this.wakeRequest = false;
-    this.dialog.close();
-    this.dialog.remove();
+    if (this.dialog?.open) this.dialog.close();
+    this.dialog?.remove();
     document.body.style.overflow = this.previousOverflow;
     this.active = null;
     this.pending = null;

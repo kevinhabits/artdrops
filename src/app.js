@@ -120,7 +120,14 @@ const player = new ExhibitionPlayer({
 function play(works) {
   if (!works.length) { notify('Add an artwork to your exhibition first.'); return; }
   lastFocus = document.activeElement;
-  activeShow = true; stopPreviews(); player.open(works, settings);
+  activeShow = true; stopPreviews();
+  try { player.open(works, settings); }
+  catch (error) {
+    player.close();
+    activeShow = false; syncPreviews();
+    console.error('Exhibition could not start:', error);
+    notify('The exhibition could not start. Reload the page and try again in an up-to-date browser.');
+  }
 }
 $('#hero-play').addEventListener('click', () => play(queue));
 $('#start-show').addEventListener('click', () => play(queue));

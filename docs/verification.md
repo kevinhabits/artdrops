@@ -7,7 +7,7 @@ Latest mixed-media checks were completed on 2026-10-19. Earlier release evidence
 ### Automated and media checks
 
 - All 81 Node tests pass. Coverage includes image decoding and failure recovery, mixed image/video transitions, paused image navigation, quarter-turn geometry, stale decode callbacks, and returning to an image after a video autoplay refusal. Library tests cover collection/media filters, rotation-aware portrait eligibility, portable backups, and the separate catalog and exhibition limits. Shipped-reference tests validate episode pairs, attribution, normalized dimensions, and preservation of the original catalog.
-- The hosted cherry-blossom derivative is 60 seconds, 1920 × 1080, H.264 with `yuv420p`, approximately 22.8 MB, and has no audio stream. A full-file decode passed, and six sampled frames confirmed motion. Its public playback URL still awaits deployment; local media verification is not a production playback check.
+- The hosted cherry-blossom derivative is 60 seconds, 1920 × 1080, H.264 with `yuv420p`, approximately 22.8 MB, and has no audio stream. A full-file decode passed, and six sampled frames confirmed motion. Production delivery and hidden-browser playback also passed, as recorded below.
 - Video previews, exhibition slots, and import validation remain muted. No sound toggle was added.
 
 ### Browser checks
@@ -17,13 +17,20 @@ Tested in the Codex browser:
 - An Orkhan image decoded at its actual 560 × 560 resolution. Hazed's **KYC** video decoded at 2000 × 2000, reached `readyState: 4`, and played muted. **DopamineDump** decoded as a 1280 × 960 GIF.
 - An image-to-video fade measured incoming opacity 0.095 with a 1.5-second transition while the outgoing frame stayed at opacity 1. Navigation from a paused video to an image displayed the new artwork while retaining the paused state.
 - Entering and exiting fullscreen updated the button labels and preserved active video playback in both states. Both **Start exhibition** and **Play exhibition** launched the player.
-- The Hazed filter returned 19 moving works and one still work. Adding 20 works succeeded; Undo restored the saved 60-work queue. The original saved queue was preserved and restored after testing.
+- At an earlier 20-work Hazed import checkpoint, the filter returned 19 moving works and one still work. Adding those 20 works succeeded; Undo restored the saved 60-work queue. The original saved queue was preserved and restored after testing. Final collection counts are listed in the reference report.
 - The 390 × 844 mobile layout had no horizontal overflow. A 2160 × 3840 player surface retained `contain` fitting. These are browser geometry checks, not a physical Samsung display test.
 - No browser console errors were recorded during these checks.
 
+### Production delivery
+
+- Application commit `603737e14eda337c8b476ceee0a62d5e63d58fd3` was pushed to GitHub. Vercel deployment `dpl_12Z8pdf7bSJ4trD9XYyAJnxLAgZm` reached **READY** and received the `artdrops.vercel.app` production alias.
+- Unauthenticated requests returned HTTP 200 for the page, stylesheet, all three application modules, both catalogs, and the blossom video and poster. Every response matched the local build's SHA-256 hash, including the complete 22,777,524-byte MP4. Content types were correct.
+- The hidden production browser displayed **1,757 works, 134 artists, and five sources**, with all 11 requested collection options. Faceprint returned 169 works; the first three visible thumbnails decoded at 550 × 550 while the cards correctly reported the artwork's 1280 × 1280 playback resolution.
+- The production blossom preview reached `readyState: 4` at 1920 × 1080, with advancing playback time, `muted: true`, and `paused: false`. No fullscreen element was present. No browser console errors were recorded.
+
 ### Remaining validation
 
-The physical Samsung setup and an uninterrupted four-hour screening remain untested. The hosted blossom file needs public playback verification after deployment. New catalog totals and the status of references still being imported are documented in [reference-import.md](reference-import.md).
+The physical Samsung setup and an uninterrupted four-hour screening remain untested. Final import counts and source-resolution limitations are documented in [reference-import.md](reference-import.md).
 
 The fullscreen and visible-browser observations above predate the user's background-only instruction. Final production checks must use a hidden browser or HTTP/media validation; do not repeat fullscreen actions or bring a window forward. A production fullscreen retest is omitted under that constraint.
 

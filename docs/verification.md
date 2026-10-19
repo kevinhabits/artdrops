@@ -1,16 +1,45 @@
 # Release verification
 
-Start/fullscreen reliability and transition releases checked on 2026-10-16. Catalog/media and physical-resolution browser checks below were completed on 2026-10-15.
+Latest mixed-media checks were completed on 2026-10-19. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
 
-## Automated and media checks
+## 2026-10-19 — mixed-media release
+
+### Automated and media checks
+
+- All 81 Node tests pass. Coverage includes image decoding and failure recovery, mixed image/video transitions, paused image navigation, quarter-turn geometry, stale decode callbacks, and returning to an image after a video autoplay refusal. Library tests cover collection/media filters, rotation-aware portrait eligibility, portable backups, and the separate catalog and exhibition limits. Shipped-reference tests validate episode pairs, attribution, normalized dimensions, and preservation of the original catalog.
+- The hosted cherry-blossom derivative is 60 seconds, 1920 × 1080, H.264 with `yuv420p`, approximately 22.8 MB, and has no audio stream. A full-file decode passed, and six sampled frames confirmed motion. Its public playback URL still awaits deployment; local media verification is not a production playback check.
+- Video previews, exhibition slots, and import validation remain muted. No sound toggle was added.
+
+### Browser checks
+
+Tested in the Codex browser:
+
+- An Orkhan image decoded at its actual 560 × 560 resolution. Hazed's **KYC** video decoded at 2000 × 2000, reached `readyState: 4`, and played muted. **DopamineDump** decoded as a 1280 × 960 GIF.
+- An image-to-video fade measured incoming opacity 0.095 with a 1.5-second transition while the outgoing frame stayed at opacity 1. Navigation from a paused video to an image displayed the new artwork while retaining the paused state.
+- Entering and exiting fullscreen updated the button labels and preserved active video playback in both states. Both **Start exhibition** and **Play exhibition** launched the player.
+- The Hazed filter returned 19 moving works and one still work. Adding 20 works succeeded; Undo restored the saved 60-work queue. The original saved queue was preserved and restored after testing.
+- The 390 × 844 mobile layout had no horizontal overflow. A 2160 × 3840 player surface retained `contain` fitting. These are browser geometry checks, not a physical Samsung display test.
+- No browser console errors were recorded during these checks.
+
+### Remaining validation
+
+The physical Samsung setup and an uninterrupted four-hour screening remain untested. The hosted blossom file needs public playback verification after deployment. New catalog totals and the status of references still being imported are documented in [reference-import.md](reference-import.md).
+
+The fullscreen and visible-browser observations above predate the user's background-only instruction. Final production checks must use a hidden browser or HTTP/media validation; do not repeat fullscreen actions or bring a window forward. A production fullscreen retest is omitted under that constraint.
+
+## Historical verification — 2026-10-15 and 2026-10-16
+
+The following evidence applies to the earlier video-only releases. Start/fullscreen reliability and transition checks were completed on 2026-10-16; catalog/media and display-resolution browser checks were completed on 2026-10-15.
+
+### Automated and media checks
 
 - 57 Node tests pass: catalog diversity and attribution, portrait resolution/coverage thresholds, larger-catalog retention, media/input validation, filter composition, queue reordering, portable import/export, custom-library retention, one-hour mix construction, shuffle, failed-work quarantine, pause timing, stale asynchronous callbacks, paused navigation, fullscreen ownership, transition preference migration, fade timing, rapid navigation, stale fade callbacks, immediate/reduced-motion cleanup, and continuous single-artwork loops. New startup tests cover media-before-fullscreen ordering, the complete player surface inside its modal, synchronous and asynchronous fullscreen denial, repeated toggles, unsupported APIs, pending-request deduplication, late completion after close/reopen, and Escape/cancel. Autoplay tests cover recoverable policy refusal, same-artwork Resume, frozen clocks/watchdogs, genuine media failures, and stale playback events.
 - `npm run build` produces a static site with no runtime dependencies.
 - All 167 selected videos passed source-page, poster, MP4-signature, native-dimension, and decoded temporal-frame checks. There are 123 artist identities across objkt and Verse, with at most two works per artist. The portrait selection contains 60 works by 53 artists, including 18 native 2160 × 3840 works. See `catalog.md` for the method and maintenance command.
 - Accelerated playback simulations cover four 120-work cycles at 30 seconds per work, both with every work available and with 12 additional unavailable works. They verify each healthy work appears once per cycle, no immediate repeat across a cycle boundary, failed works stay skipped, and only two video elements are reused. A regression test covers continuing playback when only one healthy work remains.
-- No source artwork binaries, credentials, API keys, or generated build files are included in Git.
+- At that earlier release, no source artwork binaries, credentials, API keys, or generated build files were included in Git. This historical statement does not describe the later hosted blossom derivative.
 
-## Browser checks
+### Browser checks
 
 Tested in the Codex browser:
 
@@ -35,7 +64,7 @@ Tested in the Codex browser:
 
 The current embedded browser successfully exercises the Fullscreen API and shows the complete player surface; switching automation contexts can itself leave fullscreen. Earlier API inspection incorrectly inferred no support from unavailable properties in the restricted DOM inspection scope. Unsupported and denied fullscreen paths are now covered by dedicated regression tests. Separate Google Chrome access was not approved, so standalone Chrome and the actual Samsung setup remain unverified. The fullscreen target is now a regular child containing all player UI inside the modal, avoiding the page/document being placed above the modal in the browser's top layer.
 
-## Boundaries
+### Boundaries of the historical checks
 
 The site and catalog are static, but videos stream from external hosts. Their future availability and the venue's connection cannot be guaranteed. The player retries and skips failures. Source resolution varies; the 4K display mode does not upscale source detail.
 

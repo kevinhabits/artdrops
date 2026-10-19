@@ -1,5 +1,5 @@
 import { ExhibitionPlayer } from './player.js';
-import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, readExhibition, durationLabel, safeUrl } from './core.js';
+import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, displayDimensions, readExhibition, durationLabel, safeUrl } from './core.js';
 
 const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = 'artdrops:exhibition:v1';
@@ -54,7 +54,7 @@ function allWorks() {
   const known = new Set(catalog.map(work => work.id));
   return [...catalog, ...custom.filter(work => !known.has(work.id))];
 }
-function currentFilters() { return { search: $('#search').value, source: $('#source-filter').value, shape: $('#shape-filter').value }; }
+function currentFilters() { return { search: $('#search').value, source: $('#source-filter').value, shape: $('#shape-filter').value, collection: $('#collection-filter').value, media: $('#media-filter').value }; }
 function syncSources() {
   const select = $('#source-filter'), selected = select.value;
   select.replaceChildren(new Option('All sources', 'all'));
@@ -62,6 +62,12 @@ function syncSources() {
   sources.forEach(source => select.append(new Option(source, source)));
   select.value = sources.includes(selected) ? selected : 'all';
   select.hidden = sources.length < 2;
+  const collectionSelect = $('#collection-filter'), currentCollection = collectionSelect.value;
+  const counts = new Map();
+  allWorks().forEach(work => { if (work.collection) counts.set(work.collection, (counts.get(work.collection) || 0) + 1); });
+  collectionSelect.replaceChildren(new Option('All collections', 'all'));
+  [...counts].sort(([a], [b]) => a.localeCompare(b)).forEach(([name, count]) => collectionSelect.append(new Option(`${name} · ${count}`, name)));
+  collectionSelect.value = counts.has(currentCollection) ? currentCollection : 'all';
 }
 
 function stopPreviews() { observed.forEach(video => video.pause()); }
@@ -91,6 +97,17 @@ function unloadVideo(video) {
   video.removeAttribute('src'); video.load();
 }
 function previewVideo(work, container) {
+  if (work.kind === 'image') {
+    const image = element('img', 'art-preview-image');
+    image.src = work.posterUrl || work.mediaUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+    const fallbacks = [...new Set([work.mediaUrl, work.alternateMediaUrl].filter(Boolean))].filter(url => url !== image.src);
+    image.addEventListener('error', () => {
+      if (fallbacks.length) image.src = fallbacks.shift();
+      else if (!container.querySelector('.media-error')) container.append(element('div', 'media-error', 'Preview unavailable'));
+    });
+    container.append(image); rotatePreview(image, work, container);
+    return image;
+  }
   const video = element('video');
   video.muted = true; video.defaultMuted = true; video.loop = true; video.playsInline = true;
   video.preload = 'none'; video.setAttribute('aria-hidden', 'true');
@@ -109,8 +126,25 @@ function previewVideo(work, container) {
       container.append(error);
     }
   });
-  container.append(video); watchVideo(video);
+  container.append(video); rotatePreview(video, work, container); watchVideo(video);
   return video;
+}
+
+const rotatedPreviews = new Map();
+const rotationObserver = new ResizeObserver(entries => {
+  for (const entry of entries) {
+    const media = rotatedPreviews.get(entry.target);
+    if (media) { media.style.width = `${entry.contentRect.height}px`; media.style.height = `${entry.contentRect.width}px`; }
+  }
+});
+function rotatePreview(media, work, container) {
+  if (!work.rotation) return;
+  media.style.transform = `translate(-50%, -50%) rotate(${work.rotation}deg)`;
+  media.style.left = '50%'; media.style.top = '50%';
+  if ([90, 270].includes(work.rotation)) { rotatedPreviews.set(container, media); rotationObserver.observe(container); }
+}
+function clearRotatedPreviews(host) {
+  for (const [container] of rotatedPreviews) if (container === host || host.contains(container)) { rotationObserver.unobserve(container); rotatedPreviews.delete(container); }
 }
 
 const player = new ExhibitionPlayer({
@@ -140,7 +174,21 @@ function updateSelectionButtons() {
     button.textContent = selected ? '✓' : '+';
     button.setAttribute('aria-label', `${selected ? 'Remove' : 'Add'} ${button.dataset.title} ${selected ? 'from' : 'to'} exhibition`);
   });
+  const addCollection = $('#add-filtered');
+  const available = filterWorks(allWorks(), currentFilters()).filter(work => !ids.has(work.id)).length;
+  const count = Math.min(available, MAX_WORKS - queue.length);
+  addCollection.hidden = $('#collection-filter').value === 'all';
+  addCollection.disabled = count === 0;
+  addCollection.textContent = count ? `Add ${count} ${count === 1 ? 'work' : 'works'}` : available ? 'Exhibition full' : 'Already added';
 }
+$('#add-filtered').addEventListener('click', () => {
+  const previous = queue, ids = new Set(queue.map(work => work.id));
+  const available = filterWorks(allWorks(), currentFilters()).filter(work => !ids.has(work.id));
+  const selected = available.slice(0, MAX_WORKS - queue.length);
+  if (!selected.length) return;
+  queue = [...queue, ...selected]; updateQueue(); persist();
+  notify(`Added ${selected.length} works.${available.length > selected.length ? ` The exhibition limit is ${MAX_WORKS}; the rest remain in the library.` : ''}`, () => { queue = previous; updateQueue(); persist(); });
+});
 function toggleWork(work) {
   const index = queue.findIndex(item => item.id === work.id);
   if (index >= 0) { removeWork(index); return; }
@@ -156,6 +204,7 @@ function removeWork(index) {
 }
 function renderFeatured() {
   const host = $('#featured');
+  clearRotatedPreviews(host);
   host.querySelectorAll('video').forEach(unloadVideo); host.replaceChildren();
   if (!catalog.length) return;
   const work = catalog[0];
@@ -172,18 +221,20 @@ function renderFeatured() {
 }
 function renderLibrary() {
   const grid = $('#art-grid');
+  clearRotatedPreviews(grid);
   grid.querySelectorAll('video').forEach(unloadVideo); grid.replaceChildren();
   const works = filterWorks(allWorks(), currentFilters());
   const portraitView = ['screen-portrait', 'portrait'].includes($('#shape-filter').value);
   grid.classList.toggle('portrait-grid', portraitView);
-  $('#results-count').textContent = `${works.length} ${works.length === 1 ? 'work' : 'works'} · ${$('#shape-filter').value === 'screen-portrait' ? 'For your 9:16 screen' : 'Motion only'}`;
+  $('#results-count').textContent = `${works.length} ${works.length === 1 ? 'work' : 'works'}${$('#shape-filter').value === 'screen-portrait' ? ' · For your 9:16 screen' : ''}`;
   $('#empty-state').hidden = works.length > 0 || !loaded;
   $('#load-more').hidden = works.length <= visibleCount;
   $('#load-more').textContent = `Show ${Math.min(PAGE_SIZE, works.length - visibleCount)} more works ↓`;
   works.slice(0, visibleCount).forEach(work => {
     const card = element('article', 'art-card'); card.dataset.workId = work.id;
     const visual = element('div', 'art-visual'); previewVideo(work, visual);
-    const videoTag = element('span', 'video-tag', isPortraitScreenWork(work) ? (work.width >= 2160 && work.height >= 3840 ? '4K PORTRAIT' : 'PORTRAIT FIT') : 'MOVING ART');
+    const dimensions = displayDimensions(work);
+    const videoTag = element('span', 'video-tag', isPortraitScreenWork(work) ? (dimensions.width >= 2160 && dimensions.height >= 3840 ? '4K PORTRAIT' : 'PORTRAIT FIT') : work.kind === 'image' ? (work.animated ? 'ANIMATION' : 'STILL ART') : 'MOVING ART');
     const preview = element('button', 'preview-button'); preview.setAttribute('aria-label', `Preview ${work.title} by ${work.artist}`);
     const circle = element('span', 'preview-play'); circle.append(element('span', 'play-icon')); preview.append(circle);
     preview.addEventListener('click', () => play([work])); visual.append(videoTag, preview);
@@ -193,7 +244,8 @@ function renderLibrary() {
     const source = element(work.sourceUrl ? 'a' : 'span', 'art-source', `${work.source}${work.sourceUrl ? ' ↗' : ''}`);
     if (work.sourceUrl) { source.href = work.sourceUrl; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.setAttribute('aria-label', `View ${work.title} on ${work.source}`); }
     caption.append(title, artist, source);
-    if (work.width && work.height) caption.append(element('span', 'art-dimensions', `${work.width} × ${work.height}`));
+    if (work.collection) { const collection = element('span', 'art-collection', work.collection); collection.title = work.collection; caption.append(collection); }
+    if (dimensions.width && dimensions.height) caption.append(element('span', 'art-dimensions', `${dimensions.width} × ${dimensions.height}${work.rotation ? ` · rotated ${work.rotation}°` : ''}`));
     const add = element('button', 'add-button', '+'); add.dataset.id = work.id; add.dataset.title = work.title;
     add.addEventListener('click', () => toggleWork(work));
     info.append(caption, add); card.append(visual, info); grid.append(card);
@@ -261,8 +313,8 @@ $('#hour-mix').addEventListener('click', () => {
     ({ queue, settings } = previous); syncSettings(); updateQueue(); persist();
   });
 });
-for (const id of ['search', 'source-filter', 'shape-filter']) $(`#${id}`).addEventListener(id === 'search' ? 'input' : 'change', () => { visibleCount = PAGE_SIZE; renderLibrary(); });
-$('#reset-filters').addEventListener('click', () => { $('#search').value = ''; $('#source-filter').value = 'all'; $('#shape-filter').value = 'all'; visibleCount = PAGE_SIZE; renderLibrary(); });
+for (const id of ['search', 'source-filter', 'shape-filter', 'collection-filter', 'media-filter']) $(`#${id}`).addEventListener(id === 'search' ? 'input' : 'change', () => { visibleCount = PAGE_SIZE; renderLibrary(); });
+$('#reset-filters').addEventListener('click', () => { $('#search').value = ''; for (const id of ['source-filter', 'shape-filter', 'collection-filter', 'media-filter']) $(`#${id}`).value = 'all'; visibleCount = PAGE_SIZE; renderLibrary(); });
 $('#load-more').addEventListener('click', () => { visibleCount += PAGE_SIZE; renderLibrary(); });
 
 for (const [button, dialog] of [['guide-open', 'guide-dialog'], ['about-open', 'about-dialog'], ['add-link-open', 'add-dialog']]) {
@@ -296,22 +348,39 @@ function checkVideo(url, signal) {
     if (signal.aborted) abort(); else { video.src = url; video.load(); }
   });
 }
+function checkImage(url, signal) {
+  return new Promise((resolve, reject) => {
+    const image = new Image(); let finished = false;
+    const timeout = setTimeout(() => finish(new Error('The image took too long to load. Check the link or try a smaller file.')), 15000);
+    const abort = () => finish(new DOMException('Cancelled', 'AbortError'));
+    function finish(error) {
+      if (finished) return; finished = true;
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      clearTimeout(timeout); signal.removeEventListener('abort', abort); image.onload = null; image.onerror = null; image.removeAttribute('src');
+      if (error) reject(error); else resolve(dimensions);
+    }
+    image.onload = () => image.naturalWidth > 0 ? finish() : finish(new Error('This link does not contain a readable image.'));
+    image.onerror = () => finish(new Error('This image could not load. Use a direct public JPG, PNG, WebP, or GIF URL.'));
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort(); else image.src = url;
+  });
+}
 $('#add-form').addEventListener('submit', async event => {
   event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
   const url = safeUrl(data.get('url')); const error = $('#add-error'); error.hidden = true;
-  const candidate = cleanWork({ id: `custom:${crypto.randomUUID()}`, kind: 'video', title: data.get('title'), artist: data.get('artist'), mediaUrl: url, source: 'Your links' });
-  if (!candidate) { error.textContent = 'Use an HTTPS video URL and include a title and artist.'; error.hidden = false; return; }
+  const candidate = cleanWork({ id: `custom:${crypto.randomUUID()}`, kind: data.get('kind'), rotation: Number(data.get('rotation')), title: data.get('title'), artist: data.get('artist'), mediaUrl: url, source: 'Your links', posterUrl: data.get('kind') === 'image' ? url : null, animated: data.get('kind') === 'image' && /\.gif(?:$|[?#])/i.test(url || '') });
+  if (!candidate) { error.textContent = 'Use an HTTPS artwork file URL, select its media type, and include a title and artist.'; error.hidden = false; return; }
   if (queue.length >= MAX_WORKS) { error.textContent = `An exhibition can hold up to ${MAX_WORKS} works. Remove a work before adding another.`; error.hidden = false; return; }
-  if (allWorks().some(work => work.mediaUrl === url)) {
-    const existing = allWorks().find(work => work.mediaUrl === url);
+  const existing = allWorks().find(work => work.mediaUrl === url && work.kind === candidate.kind && work.rotation === candidate.rotation);
+  if (existing) {
     if (!queue.some(work => work.id === existing.id)) toggleWork(existing);
     else notify('This artwork is already in your exhibition.');
     $('#add-dialog').close(); return;
   }
   importController?.abort(); importController = new AbortController(); const controller = importController;
-  $('#add-submit').disabled = true; $('#add-submit').textContent = 'Checking video…';
+  $('#add-submit').disabled = true; $('#add-submit').textContent = 'Checking artwork…';
   try {
-    const dimensions = await checkVideo(url, controller.signal);
+    const dimensions = await (candidate.kind === 'image' ? checkImage : checkVideo)(url, controller.signal);
     if (controller.signal.aborted || !$('#add-dialog').open) return;
     const work = cleanWork({ ...candidate, ...dimensions, verifiedAt: new Date().toISOString() });
     const replaced = custom.length >= MAX_WORKS;
@@ -347,7 +416,14 @@ async function loadCatalog() {
     if (!response.ok) throw new Error('Catalog unavailable');
     const result = await response.json();
     if (result.version !== 1 || !Array.isArray(result.works)) throw new Error('Invalid catalog');
-    const works = uniqueWorks(result.works, MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
+    let references;
+    try {
+      const extra = await fetch('/references.json', { signal: AbortSignal.timeout(12000) });
+      if (!extra.ok) throw new Error('References unavailable');
+      references = await extra.json();
+      if (references.version !== 1 || !Array.isArray(references.works)) throw new Error('Invalid references');
+    } catch { references = null; notify('The requested collections could not load. The original library is still available; reload to try again.'); }
+    const works = uniqueWorks([...result.works, ...(references?.works || [])], MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
     catalog = works; loaded = true;
     syncMix();
     const fresh = new Map(catalog.map(work => [work.id, work])); queue = queue.map(work => fresh.get(work.id) || work);
@@ -358,8 +434,18 @@ async function loadCatalog() {
     }
     const artists = new Set(catalog.map(work => work.artistKey)).size, sources = new Set(catalog.map(work => work.source)).size;
     $('#collection-stats').textContent = `${catalog.length} works · ${artists} artists · ${sources} ${sources === 1 ? 'source' : 'sources'}`;
-    const date = new Date(result.updatedAt);
-    $('#catalog-updated').textContent = Number.isNaN(date.getTime()) ? '' : `Catalog checked ${new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' }).format(date)}. Video links and decoded motion were checked during selection.`;
+    const date = new Date(references?.updatedAt || result.updatedAt);
+    $('#catalog-updated').textContent = Number.isNaN(date.getTime()) ? '' : `Catalog checked ${new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' }).format(date)}. Media links were checked during selection; availability can change.`;
+    const referenceList = $('#reference-list'); referenceList.replaceChildren();
+    for (const reference of references?.references || []) {
+      const item = element('li');
+      const link = element('a', '', reference.name);
+      const url = safeUrl(reference.url);
+      if (url) { link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+      item.append(link, element('span', '', `${reference.available || 0} available${reference.note ? ` · ${reference.note}` : ''}`));
+      referenceList.append(item);
+    }
+    $('#reference-status').hidden = !referenceList.children.length;
     syncSources(); renderFeatured(); renderLibrary(); updateQueue();
   } catch {
     $('#catalog-error').hidden = false; $('#collection-stats').textContent = 'Collection temporarily unavailable';

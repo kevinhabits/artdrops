@@ -1,6 +1,6 @@
 # ArtDrops
 
-A small, motion-only digital art exhibition app. Browse a saved selection, make a queue, and give the artwork the whole screen.
+A small, silent digital art exhibition app. Browse videos, images, and animated art, make a queue, and give the artwork the whole screen.
 
 **Vanilla HTML, CSS, and JavaScript. Zero runtime dependencies. No account, API key, wallet, database, or backend.**
 
@@ -28,7 +28,7 @@ npm start     # Serves the production build locally
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Fullscreen changes keep the current artwork playing. Escape leaves fullscreen first; Close leaves the exhibition directly. If fullscreen is unavailable, the show fills the browser window. If the browser blocks playback, select **Resume** to start the same artwork.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
-Art plays silently and loops. Artist captions show the artwork title, then **Artist · Source** (for example, **Cromwell · objkt**). **9:16 screen** filters for videos at least 1080 × 1920 that cover at least 90% of the portrait display without cropping. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show actual decoded dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
+Art plays silently and loops. Artist captions show the artwork title, then **Artist · Source** (for example, **Cromwell · objkt**). **9:16 screen** filters for artwork at least 1080 × 1920 that covers at least 90% of the portrait display without cropping, accounting for any rotation. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show verified dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
 
 For a four-hour event, start the one-hour mix and leave it running. Every work appears once per pass, then the next pass uses a fresh shuffle with no immediate repeat at the boundary. The exhibition continues until you stop it; there is no four-hour cutoff. Loading delays, pauses, and unavailable works can change the wall-clock length of a pass.
 
@@ -36,15 +36,17 @@ For a four-hour event, start the one-hour mix and leave it running. Every work a
 
 The queue and settings, including transitions, save locally in this browser. **Export exhibition** downloads a JSON backup you can import on another computer. Export contains links and credits, not the artwork files. Removing a work or importing an exhibition offers Undo.
 
-**Add your own** accepts a direct, public HTTPS MP4 or WebM URL and verifies that the browser decodes a video frame. YouTube pages, marketplace pages, still images, and arbitrary HTML embeds are not video files. Imported external links are rendered only inside native video elements; remote scripts are never embedded.
+Use **Collection** to browse a requested series, **Media** to choose moving or still art, and search to find an artist, title, or mask variant. The **Add works** button adds the current collection selection up to the 150-work exhibition limit, with Undo. **Your references · availability** links to the included reference sources and shows their verified playable entries.
+
+**Add your own** accepts a direct, public HTTPS MP4/WebM video or JPG/PNG/WebP/GIF image URL and checks that the browser decodes it. You can rotate individual works 90°, 180°, or 270°. YouTube, marketplace, and Drive preview pages are not direct files. Imported links use native video/image elements; remote scripts are never embedded. Videos always remain muted.
 
 ## The collection
 
-The versioned catalog lives in `public/catalog.json`. See [catalog selection and verification](docs/catalog.md) for sources and checks. Catalog data is a checked snapshot, not a live sales ranking. Discovery does not require a marketplace API to be available at page load. Art still streams from external hosts, whose availability can change.
+The original 167-video catalog lives in `public/catalog.json`. Verified requested additions live in `public/references.json`: SuperRare collections and artist profiles, 414 Orkhan *Untitled* episodes with 414 mask variants, and Emberblend's cherry-blossom loop. The Orkhan files are 560 × 560 gallery images and remain outside the high-resolution 9:16 preset. See [catalog selection](docs/catalog.md) and [reference import status](docs/reference-import.md) for current counts, checks, and limitations. Catalog data is a checked snapshot, not a live sales ranking. Discovery does not require a marketplace API to be available at page load. Most art streams from external hosts, whose availability can change.
 
-The player preloads the next work and begins the soft fade only when it is ready to display. The outgoing artwork stays visible while the next one loads. Fades overlap the artwork slots, so they do not add time to the one-hour program. The system’s reduced-motion preference disables fades. The player retries an alternate URL when present and skips failed or stalled works. If every work fails, it stops with a clear message rather than spinning through an endless queue. On the collection page, a maximum of four visible previews animate at once; reduced-motion users get still identification previews until they explicitly start playback.
+The player preloads the next work and begins the soft fade only when it is ready to display. The outgoing artwork stays visible while the next one loads. Fades overlap the artwork slots, so they do not add time to the one-hour program. The system’s reduced-motion preference disables fades. The player retries an alternate URL when present and skips failed or stalled works. If every work fails, it stops with a clear message rather than spinning through an endless queue. On the collection page, a maximum of four visible video previews play at once; reduced-motion users get still video posters until they explicitly start playback. SuperRare images and GIFs use lighter still thumbnails where available; opening an artwork plays its verified media file.
 
-Artwork titles and artist credits come from the source platforms. ArtDrops does not own or sell the artwork. Public display permissions are artwork-specific; consult each source or artist before a public exhibition. The repository includes metadata and links, not copies of the original artwork.
+Artwork titles and artist credits come from the source platforms. ArtDrops does not own or sell the artwork. Public display permissions are artwork-specific; consult each source or artist before a public exhibition. Most entries stream from their original hosts. The cherry-blossom loop includes a silent browser-compatible copy with the creator's reuse statement and attribution in [public/media/README.md](public/media/README.md).
 
 ## Deployment
 

@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f6f2">
-  <meta name="description" content="Moving art. Thoughtfully selected. Build a personal exhibition of animated digital art and bring it to the big screen.">
-  <meta property="og:title" content="ArtDrops — A little space for moving art">
-  <meta property="og:description" content="Discover moving art. Make an exhibition. Give it the whole screen.">
+  <meta name="description" content="Art, thoughtfully selected. Build a personal exhibition of digital art, photography, and paintings for the big screen.">
+  <meta property="og:title" content="ArtDrops — A little space for art">
+  <meta property="og:description" content="Discover art. Make an exhibition. Give it the whole screen.">
   <meta property="og:type" content="website">
-  <title>ArtDrops — A little space for moving art</title>
+  <title>ArtDrops — A little space for art</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/src/app.js"></script>
@@ -23,8 +23,8 @@
   <main class="shell">
     <section class="intro" aria-labelledby="intro-title">
       <div class="intro-copy">
-        <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> A LITTLE SPACE FOR MOVING ART</p>
-        <h1 id="intro-title">Good art.<br>Always <em>in motion.</em></h1>
+        <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> A LITTLE SPACE FOR ART</p>
+        <h1 id="intro-title">Good art.<br>Made <em>to be seen.</em></h1>
         <p class="intro-description">Discover something that moves you.<br>Make it an exhibition. Give it the whole screen.</p>
         <div class="intro-actions"><button class="button button-dark" id="hero-play"><span class="play-icon" aria-hidden="true"></span>Play exhibition</button><a class="text-link" href="#collection">Explore the collection <span aria-hidden="true">↗</span></a></div>
         <p class="quiet-note">No account. Just art, and a little time.</p>
@@ -32,18 +32,20 @@
       <div class="featured" id="featured"><div class="art-loading"><span class="loading-orbit"></span><span>Opening the collection</span></div></div>
     </section>
     <section class="collection-section" id="collection" aria-labelledby="collection-title">
-      <div class="section-heading"><div><p class="eyebrow">THE COLLECTION / 001</p><h2 id="collection-title">Stay for a while.</h2></div><p class="collection-stats" id="collection-stats" aria-live="polite">Loading moving art…</p></div>
+      <div class="section-heading"><div><p class="eyebrow">THE COLLECTION / 001</p><h2 id="collection-title">Stay for a while.</h2></div><p class="collection-stats" id="collection-stats" aria-live="polite">Loading art…</p></div>
       <div class="workspace">
         <div class="library">
           <div class="toolbar">
             <label class="search-field"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find an artwork or artist" aria-label="Find an artwork or artist" autocomplete="off"></label>
             <label class="sr-only" for="source-filter">Marketplace</label><select id="source-filter"><option value="all">All sources</option></select>
-            <label class="sr-only" for="shape-filter">Artwork shape</label><select id="shape-filter"><option value="screen-portrait" selected>9:16 screen</option><option value="all">All shapes</option><option value="landscape">Landscape</option><option value="square">Square</option><option value="portrait">All portrait</option></select>
+            <label class="sr-only" for="shape-filter">Artwork shape</label><select id="shape-filter"><option value="screen-portrait">9:16 screen</option><option value="all" selected>All shapes</option><option value="landscape">Landscape</option><option value="square">Square</option><option value="portrait">All portrait</option></select>
           </div>
-          <div class="library-meta"><p id="results-count">Motion only. Every frame belongs here.</p><button class="text-button" id="add-link-open"><span aria-hidden="true">＋</span> Add your own</button></div>
+          <div class="collection-filters"><label for="collection-filter">Collection<select id="collection-filter"><option value="all">All collections</option></select></label><label for="media-filter">Media<select id="media-filter"><option value="all">All media</option><option value="moving">Moving art</option><option value="still">Still art</option></select></label></div>
+          <details id="reference-status" class="reference-status" hidden><summary>Your references · availability</summary><ul id="reference-list"></ul></details>
+          <div class="library-meta"><p id="results-count">Find something for your exhibition.</p><button class="text-button" id="add-filtered" hidden>Add these works</button><button class="text-button" id="add-link-open"><span aria-hidden="true">＋</span> Add your own</button></div>
           <div class="art-grid" id="art-grid" aria-live="polite" aria-busy="true"></div>
-          <div class="empty-state" id="empty-state" hidden><span class="empty-mark" aria-hidden="true">↗</span><h3>A little too specific.</h3><p>Try another artist, source, or shape.</p><button id="reset-filters" class="button button-light">Reset filters</button></div>
-          <button id="load-more" class="button button-light load-more" hidden>More moving art <span aria-hidden="true">↓</span></button>
+          <div class="empty-state" id="empty-state" hidden><span class="empty-mark" aria-hidden="true">↗</span><h3>A little too specific.</h3><p>Try another artist, collection, or shape.</p><button id="reset-filters" class="button button-light">Reset filters</button></div>
+          <button id="load-more" class="button button-light load-more" hidden>More artwork <span aria-hidden="true">↓</span></button>
           <div id="catalog-error" class="empty-state" hidden><h3>The collection couldn’t load.</h3><p>Your saved exhibition is still here. Reconnect and try again.</p><button id="retry-catalog" class="button button-dark">Try again</button></div>
         </div>
         <aside class="exhibition-panel" id="exhibition" aria-labelledby="exhibition-title">
@@ -66,12 +68,12 @@
         </aside>
       </div>
     </section>
-    <section class="closing-note"><span class="closing-mark" aria-hidden="true">✳</span><p>A moment for moving art.<br><em>A reason to look a little longer.</em></p><a href="#collection" aria-label="Back to collection">↑</a></section>
+    <section class="closing-note"><span class="closing-mark" aria-hidden="true">✳</span><p>A moment for art.<br><em>A reason to look a little longer.</em></p><a href="#collection" aria-label="Back to collection">↑</a></section>
   </main>
   <footer class="site-footer shell"><span>artdrops <span class="footer-separator">/</span> A living collection.</span><span>Artwork belongs to its artists. <button class="text-button" id="about-open">About this collection ↗</button></span></footer>
   <dialog id="guide-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close display guide">×</button><p class="eyebrow">THE BIG SCREEN</p><h2>Set the room in motion.</h2><p>Connect your laptop to your Samsung display, then move this browser window onto that screen.</p><ol class="guide-steps"><li><strong>Give it all the pixels.</strong><span>For your Samsung Follow Me Pro 43″, set the connected computer’s display rotation to 90° or 270° and select 2160 × 3840 portrait output at 60 Hz when available. Rotate the screen to match. Artwork stays upright; ArtDrops does not rotate your desktop.</span></li><li><strong>Make your selection.</strong><span>Choose “Portrait screen · 9:16,” then “Build a 1-hour mix.” The selection uses high-resolution upright works that fill at least 90% of your screen without cropping. Native 4K portraits are labeled; other works are displayed at their available resolution. “Between artworks” lets you choose a gentle fade or an instant switch.</span></li><li><strong>Press play. Settle in.</strong><span>Start the exhibition and press F for fullscreen. Keep the laptop plugged in and disable system sleep for a long show. Use the laptop browser over HDMI or USB-C and keep an internet connection for artwork playback. The Samsung’s built-in browser has not been verified for this show.</span></li></ol><div class="keyboard-guide"><span><kbd>←</kbd><kbd>→</kbd> Change work</span><span><kbd>Space</kbd> Pause</span><span><kbd>F</kbd> Fullscreen</span><span><kbd>Esc</kbd> Leave show</span></div><p class="dialog-footnote">Playback is silent. The one-hour mix reshuffles and repeats for a four-hour event, or as long as you leave it running. Close the exhibition to stop it.</p></dialog>
-  <dialog id="about-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close collection information">×</button><p class="eyebrow">A NOTE ON THE COLLECTION</p><h2>Artists first. Motion always.</h2><p>This is a saved selection of moving artworks from public marketplace catalogs, chosen for variety and playable media. It’s an introduction to the artists, not a sales ranking.</p><p>Every work links to its source. The art streams from its original host; ArtDrops does not own or sell it. A checked link can still become unavailable, so the player skips failed works and keeps the show going.</p><p id="catalog-updated"></p><p class="dialog-footnote">Public exhibition permissions depend on the artwork and artist. Check the source or contact the artist before including their work in your public show.</p></dialog>
-  <dialog id="add-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close add artwork">×</button><p class="eyebrow">MAKE IT PERSONAL</p><h2>Bring your own motion.</h2><p>Add a direct MP4 or WebM link. We’ll check that it plays before adding it to your exhibition.</p><form id="add-form"><label>Artwork title<input name="title" required maxlength="160" placeholder="Give this work a name"></label><label>Artist<input name="artist" required maxlength="120" placeholder="Credit the artist"></label><label>Video URL<input name="url" type="url" required placeholder="https://…/artwork.mp4"></label><p class="field-help">Use the video file’s URL, rather than a marketplace or YouTube page.</p><p id="add-error" class="form-error" role="alert" hidden></p><button class="button button-accent" type="submit" id="add-submit">Check & add artwork <span aria-hidden="true">↗</span></button></form></dialog>
+  <dialog id="about-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close collection information">×</button><p class="eyebrow">A NOTE ON THE COLLECTION</p><h2>Artists first.</h2><p>A saved library of moving art, photographs, and paintings from public catalogs and your chosen references. It’s an introduction to the artists, not a sales ranking.</p><p>Every work links to its source. ArtDrops does not own or sell the artwork. A checked link can still become unavailable, so the player skips failed works and keeps the show going.</p><p id="catalog-updated"></p><p class="dialog-footnote">Public exhibition permissions depend on the artwork and artist. Check the source or contact the artist before including their work in your public show.</p></dialog>
+  <dialog id="add-dialog" class="content-dialog"><button class="dialog-close icon-button" data-close aria-label="Close add artwork">×</button><p class="eyebrow">MAKE IT PERSONAL</p><h2>Bring your own artwork.</h2><p>Add a direct video or image link. We’ll check the file before adding it to your exhibition.</p><form id="add-form"><label>Artwork title<input name="title" required maxlength="160" placeholder="Give this work a name"></label><label>Artist<input name="artist" required maxlength="120" placeholder="Credit the artist"></label><label>Media type<select name="kind"><option value="video">Video · MP4 / WebM</option><option value="image">Image · JPG / PNG / WebP / GIF</option></select></label><label>Rotation<select name="rotation"><option value="0">None</option><option value="90">90° clockwise</option><option value="270">90° counterclockwise</option><option value="180">180°</option></select></label><label>Artwork URL<input name="url" type="url" required placeholder="https://…/artwork.mp4"></label><p class="field-help">Use a public artwork file URL, rather than a marketplace, Drive preview, or YouTube page.</p><p id="add-error" class="form-error" role="alert" hidden></p><button class="button button-accent" type="submit" id="add-submit">Check & add artwork <span aria-hidden="true">↗</span></button></form></dialog>
   <div class="toast" id="toast" role="status" hidden><span id="toast-message"></span><button id="toast-undo" hidden>Undo</button><button id="toast-close" aria-label="Dismiss notification">×</button></div>
   <noscript><div class="noscript">ArtDrops needs JavaScript to play artworks and save your exhibition. Please enable it and reload.</div></noscript>
 </body>

@@ -1,15 +1,17 @@
 const LOAD_TIMEOUT = 15_000;
 const DURATIONS = new Set([10, 20, 30, 60, 120]);
 
-export function safeMediaUrl(value, origin = globalThis.location?.origin) {
+export function safeMediaUrl(value, origin = globalThis.location?.origin, kind = 'video') {
   if (typeof value !== 'string' || !value.trim()) return null;
   try {
     const url = new URL(value, origin);
     if (url.protocol === 'blob:') return origin && url.origin === origin ? url.href : null;
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
-    // Content-addressed media often has no file extension. Native video still
-    // verifies that the response is a playable video, never an embedded page.
-    if (/\.(?:html?|svg|jpe?g|png|gif|avif|pdf|js)(?:$)/i.test(url.pathname)) return null;
+    // Content-addressed media may have no extension. Native media elements
+    // decode its contents without executing a remote page or script.
+    if (/\.(?:html?|svg|pdf|js)$/i.test(url.pathname)) return null;
+    if (kind !== 'image' && /\.(?:jpe?g|png|webp|gif|avif)$/i.test(url.pathname)) return null;
+    if (kind === 'image' && /\.(?:mp4|webm)$/i.test(url.pathname)) return null;
     return url.href;
   } catch {
     return null;
@@ -40,7 +42,7 @@ function button(label, text, action) {
   return element;
 }
 
-/** A two-video, in-browser exhibition. No remote code or iframe is executed. */
+/** A two-layer, in-browser exhibition. No remote code or iframe is executed. */
 export class ExhibitionPlayer {
   constructor({ onClose, onStatus } = {}) {
     this.onClose = onClose;
@@ -64,9 +66,9 @@ export class ExhibitionPlayer {
     };
     const ids = new Set();
     this.works = (Array.isArray(works) ? works : []).filter((work) => {
-      if (!work || work.kind !== 'video' || !work.id || ids.has(work.id)) return false;
+      if (!work || !['video', 'image'].includes(work.kind) || !work.id || ids.has(work.id)) return false;
       ids.add(work.id);
-      return Boolean(safeMediaUrl(work.mediaUrl) || safeMediaUrl(work.alternateMediaUrl));
+      return this.sources(work).length > 0;
     });
     this.order = this.settings.shuffle ? shuffleWorks(this.works) : [...this.works];
     this.position = 0;
@@ -100,6 +102,8 @@ export class ExhibitionPlayer {
     const stage = document.createElement('div');
     stage.className = 'player-stage';
     this.slots = [0, 1].map(() => {
+      const frame = document.createElement('div');
+      frame.className = 'player-frame';
       const video = document.createElement('video');
       video.className = 'player-video';
       video.muted = true;
@@ -110,13 +114,25 @@ export class ExhibitionPlayer {
       video.style.objectFit = this.settings.fit;
       video.setAttribute('aria-hidden', 'true');
       video.setAttribute('disablepictureinpicture', '');
-      const slot = { video, work: null, sourceIndex: 0, watchdog: null };
+      const image = document.createElement('img');
+      image.className = 'player-image';
+      image.alt = '';
+      image.decoding = 'async';
+      image.hidden = true;
+      image.style.objectFit = this.settings.fit;
+      const slot = { frame, video, image, work: null, sourceIndex: 0, watchdog: null };
       for (const name of ['playing', 'loadeddata', 'error', 'waiting', 'stalled']) {
         video.addEventListener(name, () => {
           if (this.opened && this.session === session) this.videoEvent(slot, name);
         }, { signal: this.controller.signal });
       }
-      stage.append(video);
+      for (const name of ['load', 'error']) {
+        image.addEventListener(name, () => {
+          if (this.opened && this.session === session) this.imageEvent(slot, name);
+        }, { signal: this.controller.signal });
+      }
+      frame.append(video, image);
+      stage.append(frame);
       return slot;
     });
     surface.append(stage);
@@ -205,9 +221,11 @@ export class ExhibitionPlayer {
         this.fullscreenOwned = false;
         if (!this.fullscreenRequest?.pending) this.fullscreenRequest = null;
       }
+      this.layoutMedia();
       this.syncFullscreenButton();
     };
     document.addEventListener('fullscreenchange', fullscreenChanged, { signal });
+    globalThis.addEventListener?.('resize', () => this.layoutMedia(), { signal });
     document.body.append(dialog);
     dialog.showModal();
     dialog.focus();
@@ -215,7 +233,7 @@ export class ExhibitionPlayer {
     this.showControls();
     this.interval = setInterval(() => this.tick(), 100);
     if (this.order.length) this.requestWork(0);
-    else this.unavailable('There are no playable videos in this exhibition. Close the player and add an artwork.');
+    else this.unavailable('There are no playable artworks in this exhibition. Close the player and add an artwork.');
     // Start media while the click still has user activation. Fullscreen may
     // consume that activation, and must never be a prerequisite for playback.
     this.syncFullscreenButton();
@@ -223,7 +241,84 @@ export class ExhibitionPlayer {
   }
 
   sources(work) {
-    return [...new Set([work.mediaUrl, work.alternateMediaUrl].map((url) => safeMediaUrl(url)).filter(Boolean))];
+    return [...new Set([work.mediaUrl, work.alternateMediaUrl].map((url) => safeMediaUrl(url, undefined, work.kind)).filter(Boolean))];
+  }
+
+  frame(slot) { return slot.frame || slot.video; }
+
+  ready(slot) {
+    return slot.work?.kind === 'image' ? slot.imageReady : !slot.video.error && slot.video.readyState >= 2;
+  }
+
+  layoutMedia() {
+    for (const slot of this.slots || []) {
+      if (!slot.frame) continue;
+      const rotation = [90, 180, 270].includes(Number(slot.work?.rotation)) ? Number(slot.work.rotation) : 0;
+      const quarterTurn = rotation === 90 || rotation === 270;
+      const width = slot.frame.clientWidth || this.surface?.clientWidth || globalThis.innerWidth;
+      const height = slot.frame.clientHeight || this.surface?.clientHeight || globalThis.innerHeight;
+      slot.frame.style.setProperty('--artwork-rotation', `${rotation}deg`);
+      slot.frame.style.setProperty('--player-media-width', quarterTurn && height ? `${height}px` : '100%');
+      slot.frame.style.setProperty('--player-media-height', quarterTurn && width ? `${width}px` : '100%');
+    }
+  }
+
+  setMedia(slot, work, source) {
+    slot.video.pause();
+    slot.work = work;
+    const isImage = work.kind === 'image';
+    slot.video.hidden = isImage;
+    if (slot.image) slot.image.hidden = !isImage;
+    this.layoutMedia();
+    if (isImage) {
+      if (slot.video.getAttribute('src')) { slot.video.removeAttribute('src'); slot.video.load(); }
+      if (slot.image.getAttribute('src') !== source || slot.imageFailed) {
+        slot.mediaToken = Symbol('image');
+        slot.imageReady = false;
+        slot.imageFailed = false;
+        slot.imageDecoding = null;
+        slot.image.src = source;
+      }
+    } else {
+      slot.mediaToken = null;
+      slot.image?.removeAttribute('src');
+      if (slot.video.getAttribute('src') !== source || slot.video.error) {
+        slot.video.src = source;
+        slot.video.load();
+      }
+    }
+  }
+
+  imageEvent(slot, event) {
+    if (slot.work?.kind !== 'image') return;
+    const fail = () => {
+      slot.imageFailed = true;
+      if (this.pending?.slot === slot) this.failPending();
+      else if (this.active === slot && !this.pending) this.failActive();
+    };
+    if (event === 'error') { fail(); return; }
+    if (!slot.image.complete) return;
+    if (!slot.image.naturalWidth) { fail(); return; }
+    if (slot.imageReady) {
+      slot.buffering = false;
+      if (this.pending?.slot === slot) this.promote();
+      return;
+    }
+    const token = slot.mediaToken;
+    if (slot.imageDecoding === token) return;
+    slot.imageDecoding = token;
+    const session = this.session;
+    const current = () => this.opened && this.session === session && slot.mediaToken === token && slot.work?.kind === 'image';
+    const decoded = () => {
+      if (!current()) return;
+      slot.imageReady = true;
+      slot.buffering = false;
+      this.clearWatch(slot);
+      if (this.pending?.slot === slot) this.promote();
+    };
+    try {
+      Promise.resolve(slot.image.decode?.()).then(decoded, () => { if (current()) fail(); });
+    } catch { if (current()) fail(); }
   }
 
   freezeClock() {
@@ -273,14 +368,18 @@ export class ExhibitionPlayer {
 
   requestWork(position, sourceIndex = null) {
     if (!this.opened) return;
-    // Complete the visible blend before reusing either of its two video slots.
+    // Complete the visible blend before reusing either of its two media slots.
     this.finishTransition();
     this.freezeClock();
     this.nextPlan = null;
     const work = this.order[position];
     if (!work) return this.unavailable();
+    if (work.kind === 'image') {
+      this.needsPlayGesture = false;
+      this.message.hidden = true;
+    }
     if (sourceIndex === null && this.active?.work.id === work.id && !this.failed.has(work.id)
-      && !this.active.buffering && !this.active.video.error && this.active.video.readyState >= 2) {
+      && !this.active.buffering && this.ready(this.active)) {
       if (this.pending) {
         this.clearWatch(this.pending.slot);
         this.pending.slot.playToken = null;
@@ -308,24 +407,25 @@ export class ExhibitionPlayer {
     const source = this.sources(work)[sourceIndex];
     if (!source) return this.failPending();
     this.clearWatch(slot);
-    slot.video.pause();
-    slot.work = work;
     slot.sourceIndex = sourceIndex;
     slot.buffering = true;
-    if (slot.video.getAttribute('src') !== source || slot.video.error) {
-      slot.video.src = source;
-      slot.video.load();
-    }
+    this.setMedia(slot, work, source);
     if (!this.active) {
       this.message.hidden = false;
       this.message.textContent = `Loading ${work.title || 'artwork'}…`;
     }
     this.watch(slot);
+    if (work.kind === 'image') { this.imageEvent(slot, 'load'); return; }
     if (!this.paused) this.play(slot, pending.token);
     else if (!this.needsPlayGesture && slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
   }
 
   play(slot, token = null) {
+    if (slot.work?.kind === 'image') {
+      if (this.pending?.slot === slot) this.imageEvent(slot, 'load');
+      else { this.clearWatch(slot); this.resumeClock(); }
+      return;
+    }
     const session = this.session;
     const playToken = Symbol('play');
     slot.playToken = playToken;
@@ -375,6 +475,7 @@ export class ExhibitionPlayer {
   }
 
   videoEvent(slot, event) {
+    if (slot.work?.kind === 'image') return;
     if (event === 'loadeddata') {
       if (this.paused && !this.needsPlayGesture && this.pending?.slot === slot && slot.video.videoWidth) this.promote();
       return;
@@ -444,20 +545,22 @@ export class ExhibitionPlayer {
 
   beginTransition(incoming, outgoing) {
     const duration = this.transitionDuration();
+    const incomingFrame = this.frame(incoming);
+    const outgoingFrame = outgoing && this.frame(outgoing);
     this.dialog.style.setProperty('--player-fade-duration', `${duration}ms`);
-    incoming.video.style.transition = 'none';
-    incoming.video.classList.remove('is-active');
-    incoming.video.style.zIndex = '2';
-    if (outgoing) {
-      outgoing.video.style.transition = 'none';
-      outgoing.video.style.zIndex = '1';
-      outgoing.video.classList.add('is-active');
+    incomingFrame.style.transition = 'none';
+    incomingFrame.classList.remove('is-active');
+    incomingFrame.style.zIndex = '2';
+    if (outgoingFrame) {
+      outgoingFrame.style.transition = 'none';
+      outgoingFrame.style.zIndex = '1';
+      outgoingFrame.classList.add('is-active');
     }
     // Flush the incoming layer at opacity zero before enabling its transition.
     // The fully opaque outgoing image stays underneath until the fade ends.
-    if (duration) void incoming.video.offsetWidth;
-    incoming.video.style.transition = duration ? '' : 'none';
-    incoming.video.classList.add('is-active');
+    if (duration) void incomingFrame.offsetWidth;
+    incomingFrame.style.transition = duration ? '' : 'none';
+    incomingFrame.classList.add('is-active');
     const state = { incoming, outgoing, session: this.session };
     this.fadeState = state;
     if (!duration) { this.finishTransition(true); return; }
@@ -472,13 +575,15 @@ export class ExhibitionPlayer {
     const state = this.fadeState;
     this.fadeState = null;
     if (state) {
-      state.incoming.video.style.transition = 'none';
-      state.incoming.video.classList.add('is-active');
-      state.incoming.video.style.zIndex = '1';
+      const incomingFrame = this.frame(state.incoming);
+      incomingFrame.style.transition = 'none';
+      incomingFrame.classList.add('is-active');
+      incomingFrame.style.zIndex = '1';
       if (state.outgoing) {
-        state.outgoing.video.style.transition = 'none';
-        state.outgoing.video.classList.remove('is-active');
-        state.outgoing.video.style.zIndex = '0';
+        const outgoingFrame = this.frame(state.outgoing);
+        outgoingFrame.style.transition = 'none';
+        outgoingFrame.classList.remove('is-active');
+        outgoingFrame.style.zIndex = '0';
         state.outgoing.video.pause();
         this.clearWatch(state.outgoing);
       }
@@ -493,14 +598,10 @@ export class ExhibitionPlayer {
     const work = this.nextPlan.order[this.nextPlan.position];
     if (work.id === this.active?.work.id) return;
     const slot = this.slots.find((candidate) => candidate !== this.active);
-    slot.video.pause();
-    slot.work = work;
     slot.sourceIndex = 0;
     const source = this.sources(work)[0];
-    if (slot.video.getAttribute('src') !== source) {
-      slot.video.src = source;
-      slot.video.load();
-    }
+    this.setMedia(slot, work, source);
+    if (work.kind === 'image') this.imageEvent(slot, 'load');
   }
 
   failPending() {
@@ -514,7 +615,7 @@ export class ExhibitionPlayer {
       return;
     }
     this.failed.add(pending.work.id);
-    this.onStatus?.(`Skipped “${pending.work.title || 'Untitled'}”: its video could not play.`);
+    this.onStatus?.(`Skipped “${pending.work.title || 'Untitled'}”: its media could not load.`);
     this.pending = null;
     this.advance(1);
   }
@@ -535,7 +636,7 @@ export class ExhibitionPlayer {
     this.advance(1);
   }
 
-  unavailable(message = 'These videos are unavailable right now. Check your connection, then close and relaunch the exhibition.') {
+  unavailable(message = 'These artworks are unavailable right now. Check your connection, then close and relaunch the exhibition.') {
     this.finishTransition();
     this.freezeClock();
     this.pending = null;
@@ -544,7 +645,9 @@ export class ExhibitionPlayer {
     for (const slot of this.slots) {
       this.clearWatch(slot);
       slot.video.pause();
-      slot.video.classList.remove('is-active');
+      this.frame(slot).classList.remove('is-active');
+      slot.mediaToken = null;
+      slot.image?.removeAttribute('src');
       slot.video.removeAttribute('src');
       slot.video.load();
     }
@@ -559,7 +662,7 @@ export class ExhibitionPlayer {
 
   tick() {
     if (!this.opened || !this.active) return;
-    if (!this.paused && !this.pending && !document.hidden) {
+    if (this.active.work?.kind !== 'image' && !this.paused && !this.pending && !document.hidden) {
       if (this.active.video.currentTime !== this.active.lastTime) {
         this.active.lastTime = this.active.video.currentTime;
         this.active.lastProgressAt = performance.now();
@@ -593,7 +696,7 @@ export class ExhibitionPlayer {
       for (const slot of this.slots) { slot.video.pause(); this.clearWatch(slot); }
       if (this.pending) {
         const slot = this.pending.slot;
-        if (slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
+        if (slot.work?.kind === 'image' ? slot.imageReady : slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
         else this.watch(slot);
       }
     } else if (this.pending) {
@@ -733,6 +836,8 @@ export class ExhibitionPlayer {
     clearTimeout(this.fadeTimer);
     for (const slot of this.slots || []) {
       this.clearWatch(slot);
+      slot.mediaToken = null;
+      slot.image?.removeAttribute('src');
       slot.video.pause();
       slot.video.removeAttribute('src');
       slot.video.load();

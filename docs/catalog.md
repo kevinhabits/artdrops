@@ -1,6 +1,6 @@
 # Artwork catalog
 
-ArtDrops ships a curated snapshot of 167 moving artworks by 123 artist identities, drawn from public objkt and Verse records. It is an editorial selection for exploring exhibition playback, not a sales ranking or a live marketplace feed. No artwork files are copied into the repository. The browser streams the original source-hosted media.
+ArtDrops' original catalog is a curated snapshot of 167 moving artworks by 123 artist identities, drawn from public objkt and Verse records. It is an editorial selection for exploring exhibition playback, not a sales ranking or a live marketplace feed. These entries stream the original source-hosted media. This document covers `public/catalog.json`; newer requested collections and the creator-authorized hosted cherry-blossom copy are documented in [reference import status](reference-import.md).
 
 ## Provenance and selection
 

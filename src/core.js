@@ -1,6 +1,6 @@
 export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', transition: 'fade', captions: true, shuffle: false });
 export const MAX_WORKS = 150;
-export const MAX_CATALOG_WORKS = 300;
+export const MAX_CATALOG_WORKS = 5000;
 export const HOUR_MIX_SIZE = 120;
 export function safeUrl(value) {
   try {
@@ -9,20 +9,26 @@ export function safeUrl(value) {
   } catch { return null; }
 }
 export function cleanWork(work) {
-  if (!work || typeof work !== 'object' || work.kind !== 'video') return null;
+  if (!work || typeof work !== 'object' || !['video', 'image'].includes(work.kind)) return null;
   const mediaUrl = safeUrl(work.mediaUrl);
-  if (!mediaUrl || /\.(?:jpg|jpeg|png|gif|svg|html?)(?:$|[?#])/i.test(mediaUrl)) return null;
+  if (!mediaUrl || /\.(?:svg|html?|js|pdf)(?:$|[?#])/i.test(mediaUrl)) return null;
+  if (work.kind === 'video' && /\.(?:jpe?g|png|gif|webp|avif)(?:$|[?#])/i.test(mediaUrl)) return null;
+  if (work.kind === 'image' && /\.(?:mp4|webm|mov)(?:$|[?#])/i.test(mediaUrl)) return null;
   if (typeof work.id !== 'string' || !work.id || work.id.length > 240) return null;
   if (typeof work.title !== 'string' || !work.title.trim() || typeof work.artist !== 'string' || !work.artist.trim()) return null;
-  const width = Number(work.width) > 0 ? Number(work.width) : null;
-  const height = Number(work.height) > 0 ? Number(work.height) : null;
+  const width = Number.isFinite(Number(work.width)) && Number(work.width) > 0 ? Number(work.width) : null;
+  const height = Number.isFinite(Number(work.height)) && Number(work.height) > 0 ? Number(work.height) : null;
+  const rotation = [0, 90, 180, 270].includes(Number(work.rotation)) ? Number(work.rotation) : 0;
+  const dimensions = displayDimensions({ width, height, rotation });
   return {
     id: work.id, title: work.title.trim().slice(0, 160), artist: work.artist.trim().slice(0, 160),
     artistKey: typeof work.artistKey === 'string' ? work.artistKey.slice(0, 240) : work.artist.toLocaleLowerCase().trim(),
-    kind: 'video', source: ['objkt', 'Verse'].includes(work.source) ? work.source : 'Your links',
+    kind: work.kind, source: ['objkt', 'Verse', 'SuperRare', 'Orkhan', 'Google Drive', 'Reddit'].includes(work.source) ? work.source : 'Your links',
+    collection: typeof work.collection === 'string' ? work.collection.trim().slice(0, 160) : '',
+    animated: work.kind === 'image' && work.animated === true, rotation,
     sourceUrl: safeUrl(work.sourceUrl), mediaUrl, alternateMediaUrl: safeUrl(work.alternateMediaUrl),
     posterUrl: safeUrl(work.posterUrl), width, height,
-    orientation: width && height ? (width / height > 1.08 ? 'landscape' : width / height < 0.92 ? 'portrait' : 'square') : (['landscape', 'portrait', 'square'].includes(work.orientation) ? work.orientation : 'unknown'),
+    orientation: width && height ? (dimensions.width / dimensions.height > 1.08 ? 'landscape' : dimensions.width / dimensions.height < 0.92 ? 'portrait' : 'square') : (['landscape', 'portrait', 'square'].includes(work.orientation) ? work.orientation : 'unknown'),
     year: String(work.year || '').slice(0, 4), description: String(work.description || '').slice(0, 1000),
     verifiedAt: typeof work.verifiedAt === 'string' ? work.verifiedAt : null,
   };
@@ -32,9 +38,16 @@ export function cleanSettings(settings = {}) {
     fit: settings?.fit === 'cover' ? 'cover' : 'contain', transition: settings?.transition === 'none' ? 'none' : 'fade',
     captions: settings?.captions !== false, shuffle: settings?.shuffle === true };
 }
-export function filterWorks(works, { search = '', source = 'all', shape = 'all' } = {}) {
+export function filterWorks(works, { search = '', source = 'all', shape = 'all', collection = 'all', media = 'all' } = {}) {
   const q = search.normalize('NFKC').toLocaleLowerCase().trim();
-  return works.filter(work => (source === 'all' || work.source === source) && (shape === 'all' || (shape === 'screen-portrait' ? isPortraitScreenWork(work) : work.orientation === shape)) && (!q || `${work.title} ${work.artist}`.normalize('NFKC').toLocaleLowerCase().includes(q)));
+  return works.filter(work => (source === 'all' || work.source === source)
+    && (collection === 'all' || work.collection === collection)
+    && (media === 'all' || (media === 'moving' ? work.kind === 'video' || work.animated : work.kind === 'image' && !work.animated))
+    && (shape === 'all' || (shape === 'screen-portrait' ? isPortraitScreenWork(work) : work.orientation === shape))
+    && (!q || `${work.title} ${work.artist} ${work.collection || ''}`.normalize('NFKC').toLocaleLowerCase().includes(q)));
+}
+export function displayDimensions(work) {
+  return [90, 270].includes(Number(work?.rotation)) ? { width: work.height, height: work.width } : { width: work?.width, height: work?.height };
 }
 export function moveItem(items, index, offset) {
   const next = [...items]; const target = index + offset;
@@ -66,13 +79,15 @@ export function makeHourMix(works, settings) {
 }
 export function portraitCoverage(work) {
   if (!work) return 0;
-  const width = Number(work.width), height = Number(work.height);
+  const dimensions = displayDimensions(work);
+  const width = Number(dimensions.width), height = Number(dimensions.height);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return 0;
   const ratio = (width / height) / (9 / 16);
   return Math.min(ratio, 1 / ratio);
 }
 export function isPortraitScreenWork(work) {
-  return Boolean(work && work.width >= 1080 && work.height >= 1920 && portraitCoverage(work) + 1e-9 >= 0.9);
+  const { width, height } = displayDimensions(work);
+  return Boolean(work && width >= 1080 && height >= 1920 && portraitCoverage(work) + 1e-9 >= 0.9);
 }
 export function portraitScreenWorks(works) {
   return uniqueWorks(works, MAX_CATALOG_WORKS).filter(isPortraitScreenWork).sort((a, b) =>

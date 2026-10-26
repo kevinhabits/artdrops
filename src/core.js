@@ -2,6 +2,7 @@ export const DEFAULT_SETTINGS = Object.freeze({ duration: 30, fit: 'contain', tr
 export const MAX_WORKS = 150;
 export const MAX_CATALOG_WORKS = 5000;
 export const HOUR_MIX_SIZE = 120;
+export const MAX_EXHIBITION_BYTES = 2_000_000;
 export function safeUrl(value) {
   try {
     const url = new URL(value);
@@ -67,10 +68,35 @@ export function readExhibition(input) {
   if (!input || input.format !== 'artdrops-exhibition' || input.version !== 1 || !Array.isArray(input.works) || input.works.length > MAX_WORKS) throw new Error('Choose an ArtDrops exhibition JSON file with up to 150 works.');
   const works = uniqueWorks(input.works);
   if (works.length !== input.works.length) throw new Error('This file contains invalid or duplicate artworks. Your exhibition was not changed.');
-  return { works, settings: cleanSettings(input.settings) };
+  const name = exhibitionName(input.name);
+  return { works, settings: cleanSettings(input.settings), ...(name ? { name } : {}) };
 }
-export function makeExhibition(works, settings) {
-  return { format: 'artdrops-exhibition', version: 1, exportedAt: new Date().toISOString(), settings: cleanSettings(settings), works: uniqueWorks(works) };
+function exhibitionName(value) {
+  if (value === undefined || value === '') return '';
+  if (typeof value !== 'string') throw new Error('The playlist name must be text.');
+  const name = value.trim().replace(/\s+/g, ' ');
+  if (name.length > 80) throw new Error('Use a playlist name of 80 characters or fewer.');
+  return name;
+}
+export function makeExhibition(works, settings, name) {
+  const snapshot = readExhibition({ format: 'artdrops-exhibition', version: 1, works, settings, name });
+  return { format: 'artdrops-exhibition', version: 1, exportedAt: new Date().toISOString(), ...snapshot };
+}
+export function serializeExhibition(works, settings, name) {
+  const text = JSON.stringify(makeExhibition(works, settings, name));
+  if (new TextEncoder().encode(text).length > MAX_EXHIBITION_BYTES) throw new Error('This exhibition exceeds the 2 MB JSON limit. Remove some works or shorten custom links.');
+  return text;
+}
+export function parseExhibition(text) {
+  if (typeof text !== 'string' || new TextEncoder().encode(text).length > MAX_EXHIBITION_BYTES) throw new Error('Choose an ArtDrops JSON file no larger than 2 MB.');
+  const imported = readExhibition(JSON.parse(text.replace(/^\uFEFF/, '')));
+  // An accepted import must also fit in its normalized export form.
+  serializeExhibition(imported.works, imported.settings, imported.name);
+  return imported;
+}
+export function exhibitionFilename(name) {
+  const slug = String(name || 'exhibition').normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 60);
+  return `artdrops-${slug || 'exhibition'}.json`;
 }
 export function makeHourMix(works, settings) {
   const selected = uniqueWorks(works).slice(0, HOUR_MIX_SIZE);

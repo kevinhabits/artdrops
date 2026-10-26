@@ -1,5 +1,6 @@
 import { ExhibitionPlayer } from './player.js';
-import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, displayDimensions, readExhibition, durationLabel, safeUrl } from './core.js';
+import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, MAX_EXHIBITION_BYTES, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, displayDimensions, readExhibition, parseExhibition, serializeExhibition, exhibitionFilename, durationLabel, safeUrl } from './core.js';
+import { PLAYLISTS_KEY, normalizePlaylistName, listPlaylists, savePlaylist, deletePlaylist, restorePlaylist, withPlaylistLock } from './playlists.js';
 
 const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = 'artdrops:exhibition:v1';
@@ -7,6 +8,7 @@ const PAGE_SIZE = 12;
 let catalog = [], custom = [], queue = [], settings = { ...DEFAULT_SETTINGS };
 let loaded = false, saved = false, visibleCount = PAGE_SIZE, toastTimer, undoAction, importController;
 let previewObserver, lastFocus, activeShow = false;
+let playlistName = '', pendingReplace = null, importRevision = 0, workingRevision = 0;
 const observed = new Set();
 const inView = new Set();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -26,7 +28,7 @@ function notify(message, undo) {
   toastTimer = setTimeout(() => { $('#toast').hidden = true; undoAction = undefined; }, undo ? 12000 : 6500);
 }
 $('#toast-close').addEventListener('click', () => { $('#toast').hidden = true; });
-$('#toast-undo').addEventListener('click', () => { const undo = undoAction; undoAction = undefined; $('#toast').hidden = true; undo?.(); });
+$('#toast-undo').addEventListener('click', async () => { const undo = undoAction; undoAction = undefined; $('#toast').hidden = true; await undo?.(); });
 
 try {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -35,19 +37,23 @@ try {
     const restored = readExhibition(stored);
     queue = restored.works;
     settings = restored.settings;
+    playlistName = restored.name || '';
     custom = uniqueWorks(Array.isArray(stored.custom) ? stored.custom : []);
     saved = true;
   }
 } catch { notify('Saved data couldn’t be read. The starter exhibition will be available when the collection loads.'); }
 
 function persist() {
+  workingRevision++;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...makeExhibition(queue, settings), custom }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...makeExhibition(queue, settings, playlistName), custom }));
     saved = true;
     $('#save-note').textContent = '✓ Saved on this browser';
+    return true;
   } catch {
     $('#save-note').textContent = 'Not saved · export a backup';
     notify('Browser storage is unavailable. Export your exhibition to keep a copy.');
+    return false;
   }
 }
 function allWorks() {
@@ -293,7 +299,7 @@ for (const id of ['duration', 'fit', 'transition', 'captions', 'shuffle']) {
     updateQueue(); persist();
   });
 }
-$('#clear-queue').addEventListener('click', () => { const previous = [...queue]; queue = []; updateQueue(); persist(); notify('Exhibition cleared.', () => { queue = previous; updateQueue(); persist(); }); });
+$('#clear-queue').addEventListener('click', () => { const previous = { queue, playlistName }; queue = []; playlistName = ''; updateQueue(); persist(); notify('Exhibition cleared.', () => { ({ queue, playlistName } = previous); updateQueue(); persist(); }); });
 function selectedMix() { return $('#mix-format').value === 'portrait' ? makePortraitMix(catalog, settings) : makeHourMix(catalog, settings); }
 function syncMix() {
   const mix = selectedMix(), portrait = $('#mix-format').value === 'portrait';
@@ -305,12 +311,12 @@ $('#mix-format').addEventListener('change', syncMix);
 $('#hour-mix').addEventListener('click', () => {
   const mix = selectedMix();
   if (!mix) return;
-  const previous = { queue, settings };
-  queue = mix.works; settings = mix.settings;
+  const previous = { queue, settings, playlistName };
+  queue = mix.works; settings = mix.settings; playlistName = '';
   syncSettings(); updateQueue(); persist();
   $('#start-show').focus({ preventScroll: true });
   notify('1-hour mix ready. A fresh shuffle every loop, for as long as you like.', () => {
-    ({ queue, settings } = previous); syncSettings(); updateQueue(); persist();
+    ({ queue, settings, playlistName } = previous); syncSettings(); updateQueue(); persist();
   });
 });
 for (const id of ['search', 'source-filter', 'shape-filter', 'collection-filter', 'media-filter']) $(`#${id}`).addEventListener(id === 'search' ? 'input' : 'change', () => { visibleCount = PAGE_SIZE; renderLibrary(); });
@@ -390,23 +396,127 @@ $('#add-form').addEventListener('submit', async event => {
   finally { if (controller === importController) { $('#add-submit').disabled = false; $('#add-submit').textContent = 'Check & add artwork ↗'; } }
 });
 
-$('#export-queue').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(makeExhibition(queue, settings), null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob); const link = element('a'); link.href = url; link.download = 'artdrops-exhibition.json'; document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 15000); notify('Exhibition exported. Import it on your show laptop.');
-});
+function exportJson(works, displaySettings, name) {
+  try {
+    const blob = new Blob([serializeExhibition(works, displaySettings, name)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob), link = element('a');
+    link.href = url; link.download = exhibitionFilename(name); document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    notify('JSON download requested. Keep the file as a backup or import it on another computer.');
+  } catch (error) { notify(error.message); }
+}
+function applyExhibition(imported, message) {
+  const previous = { queue, settings, custom, playlistName };
+  queue = imported.works; settings = imported.settings; playlistName = imported.name || '';
+  const known = new Set(catalog.map(work => work.id));
+  custom = uniqueWorks([...queue.filter(work => !known.has(work.id)), ...custom]);
+  syncSettings(); syncSources(); renderLibrary(); updateQueue();
+  const stored = persist();
+  notify(`${message}${stored ? '' : ' Browser storage is unavailable; export a backup.'}`, () => {
+    ({ queue, settings, custom, playlistName } = previous);
+    syncSettings(); syncSources(); renderLibrary(); updateQueue(); persist();
+  });
+}
+$('#export-queue').addEventListener('click', () => exportJson(queue, settings, playlistName));
 $('#import-queue').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
+  const request = ++importRevision, revision = workingRevision;
   try {
-    if (file.size > 2_000_000) throw new Error('This file is too large. Choose an ArtDrops exhibition JSON file.');
-    const imported = readExhibition(JSON.parse(await file.text()));
-    const previous = { queue, settings, custom };
-    queue = imported.works; settings = imported.settings;
-    const known = new Set(catalog.map(work => work.id)); custom = uniqueWorks([...queue.filter(work => !known.has(work.id)), ...custom]);
-    syncSettings(); syncSources(); renderLibrary(); updateQueue(); persist();
-    notify(`Imported ${queue.length} works.`, () => { ({ queue, settings, custom } = previous); syncSettings(); syncSources(); renderLibrary(); updateQueue(); persist(); });
-  } catch (error) { notify(error instanceof SyntaxError ? 'This isn’t a valid exhibition JSON file. Your exhibition is unchanged.' : error.message); }
+    if (file.size > MAX_EXHIBITION_BYTES) throw new Error('Choose an ArtDrops JSON file no larger than 2 MB.');
+    const text = await file.text();
+    if (request !== importRevision) return;
+    if (revision !== workingRevision) { notify('Import cancelled because your exhibition changed. Choose the file again to import it.'); return; }
+    const imported = parseExhibition(text);
+    applyExhibition(imported, `Imported ${imported.works.length} works${imported.name ? ` from “${imported.name}”` : ''}.`);
+  } catch (error) {
+    if (request === importRevision && revision === workingRevision) notify(error instanceof SyntaxError ? 'This isn’t a valid exhibition JSON file. Your exhibition is unchanged.' : error.message);
+  }
+});
+
+function playlistError(message = '') {
+  $('#playlist-error').textContent = message; $('#playlist-error').hidden = !message;
+}
+function resetReplacement() {
+  pendingReplace = null; $('#playlist-save').textContent = 'Save playlist';
+  $('#playlist-replace-note').hidden = true; $('#playlist-cancel-replace').hidden = true;
+}
+function renderPlaylists() {
+  const list = $('#playlist-list'); list.replaceChildren();
+  $('#playlist-empty').hidden = true;
+  $('#playlist-save').disabled = !queue.length;
+  $('#playlist-save-help').textContent = queue.length ? `${queue.length} works · ${durationLabel(queue.length, settings.duration)}` : 'Add an artwork before saving a playlist.';
+  try {
+    const entries = listPlaylists(localStorage);
+    $('#playlist-empty').hidden = entries.length > 0;
+    for (const entry of entries) {
+      const row = element('li', 'playlist-row'), details = element('div', 'playlist-details');
+      details.append(element('strong', '', entry.name), element('span', '', `${entry.exhibition.works.length} works · ${durationLabel(entry.exhibition.works.length, entry.exhibition.settings.duration)}`));
+      const actions = element('div', 'playlist-actions');
+      for (const [label, accessible, action] of [
+        ['Load', `Load ${entry.name}`, () => {
+          const current = listPlaylists(localStorage).find(item => item.id === entry.id);
+          if (!current) throw new Error('That playlist no longer exists.');
+          importRevision++; $('#playlists-dialog').close();
+          applyExhibition({ ...readExhibition(current.exhibition), name: current.name }, `Loaded “${current.name}”.`);
+        }],
+        ['Export JSON', `Export ${entry.name} as JSON`, () => {
+          $('#playlists-dialog').close(); exportJson(entry.exhibition.works, entry.exhibition.settings, entry.name);
+        }],
+        ['Delete', `Delete ${entry.name}`, async () => {
+          const removed = await withPlaylistLock(() => deletePlaylist(localStorage, entry.id));
+          $('#playlists-dialog').close();
+          notify(`Deleted “${removed.name}”.`, async () => {
+            try { await withPlaylistLock(() => restorePlaylist(localStorage, removed)); notify(`Restored “${removed.name}”.`); }
+            catch (error) { notify(error.message); }
+          });
+        }],
+      ]) {
+        const button = element('button', 'text-button', label); button.type = 'button'; button.setAttribute('aria-label', accessible);
+        button.addEventListener('click', async () => { try { await action(); } catch (error) { if ($('#playlists-dialog').open) playlistError(error.message); else notify(error.message); } });
+        actions.append(button);
+      }
+      row.append(details, actions); list.append(row);
+    }
+  } catch (error) { playlistError(error.message); $('#playlist-save').disabled = true; }
+}
+$('#playlists').addEventListener('click', () => {
+  $('#playlist-name').value = playlistName; resetReplacement(); playlistError(); renderPlaylists();
+  $('#playlists-dialog').showModal(); stopPreviews();
+});
+$('#playlist-name').addEventListener('input', () => { resetReplacement(); playlistError(); });
+$('#playlist-cancel-replace').addEventListener('click', () => { resetReplacement(); playlistError(); });
+$('#playlist-form').addEventListener('submit', async event => {
+  event.preventDefault(); playlistError();
+  $('#playlist-save').disabled = true;
+  try {
+    const name = normalizePlaylistName($('#playlist-name').value);
+    const snapshot = makeExhibition(queue, settings, name), revision = workingRevision;
+    const entry = await withPlaylistLock(() => {
+      const existing = listPlaylists(localStorage).find(item => item.name.toLowerCase() === name.toLowerCase());
+      if (existing && (pendingReplace?.id !== existing.id || pendingReplace?.updatedAt !== existing.updatedAt)) {
+        pendingReplace = { id: existing.id, updatedAt: existing.updatedAt };
+        $('#playlist-replace-note').textContent = `“${existing.name}” already exists. Replace its saved artwork and settings?`;
+        $('#playlist-replace-note').hidden = false; $('#playlist-cancel-replace').hidden = false;
+        $('#playlist-save').textContent = 'Replace saved playlist'; return;
+      }
+      return savePlaylist(localStorage, { name, works: snapshot.works, settings: snapshot.settings, ...(existing ? { replaceId: existing.id } : {}) });
+    });
+    if (!entry) return;
+    let stored = true;
+    if (revision === workingRevision) { playlistName = entry.name; stored = persist(); }
+    $('#playlists-dialog').close();
+    notify(`Saved “${entry.name}”.${stored ? '' : ' The current exhibition could not be autosaved.'}`);
+  } catch (error) { playlistError(error.message); }
+  finally {
+    $('#playlist-save').disabled = !queue.length;
+    if ($('#playlists-dialog').open && pendingReplace) $('#playlist-save').focus({ preventScroll: true });
+  }
+});
+window.addEventListener('storage', event => {
+  if (event.key === PLAYLISTS_KEY || event.key === null) {
+    resetReplacement(); playlistError(); if ($('#playlists-dialog').open) renderPlaylists();
+  }
 });
 
 async function loadCatalog() {
@@ -426,7 +536,7 @@ async function loadCatalog() {
     const works = uniqueWorks([...result.works, ...(references?.works || [])], MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
     catalog = works; loaded = true;
     syncMix();
-    const fresh = new Map(catalog.map(work => [work.id, work])); queue = queue.map(work => fresh.get(work.id) || work);
+    // Saved exhibitions are snapshots: a catalog refresh must not reset their rotation or links.
     if (!saved && !queue.length) {
       const artists = new Set();
       queue = portraitScreenWorks(catalog).filter(work => !artists.has(work.artistKey) && artists.add(work.artistKey)).slice(0, 6);

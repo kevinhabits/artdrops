@@ -1,6 +1,17 @@
 # Release verification
 
-Latest mixed-media checks were completed on 2026-10-19. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+Latest playlist and JSON checks were completed on 2026-10-26. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+
+## 2026-10-26 — named playlists and reliable JSON backups
+
+- All 115 Node tests and the static production build pass.
+- Added a compact **Playlists** dialog with explicit save/load/replace, saved-copy export, and delete with Undo. It uses browser-local storage, with no account, service, or runtime dependency. Saved copies are independent of current-exhibition autosave.
+- Automated checks cover storage failures and corruption without destructive rewrites, duplicate names, replacement confirmation/cancel, the 20-playlist limit, delete/Undo, and detached snapshots. Application integration tests execute the actual UI handlers with inert DOM/media/download boundaries: an exported Blob is fed into another app instance's file-import handler, then compared for exact artwork order, metadata, rotation, name, and settings.
+- Playlist mutations use Web Locks when available to prevent overlapping tabs from dropping each other's saves. Deterministic overlapping-write and failed-write recovery tests cover this path. Older browsers without Web Locks retain a single-tab fallback; simultaneous saved-playlist edits in those browsers are not guaranteed.
+- JSON validation covers legacy v1 files, mixed images/videos/GIFs, Unicode/BOM, malformed and duplicate entries, unsafe URLs, and the exact 2 MB UTF-8 boundary. Every accepted import and newly saved playlist can be exported within the same limit. Invalid imports leave the current exhibition and storage unchanged.
+- Fixed two data-loss regressions: a slow import can no longer overwrite a later import, playlist load, or exhibition edit; catalog completion no longer replaces imported artwork snapshots with catalog defaults sharing the same ID.
+- In an isolated hidden browser at localhost port 4174, saved two playlists, changed the current queue/settings, loaded the original snapshot, reloaded the page, checked duplicate-name confirmation/cancel, and deleted/restored a saved playlist using Undo. The desktop dialog rendered cleanly and recorded no console errors.
+- Browser download automation was unavailable under the existing approval restriction, so actual disk download/file-picker round trips were not repeated. The real export Blob, filename, attached anchor, import event handler, and Undo were verified in isolated application tests. No foreground windows, fullscreen, audible playback, or physical-display checks were used.
 
 ## 2026-10-19 — mixed-media release
 

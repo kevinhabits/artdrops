@@ -34,7 +34,13 @@ For a four-hour event, start the one-hour mix and leave it running. Every work a
 
 ## Your exhibition
 
-The queue and settings, including transitions, save locally in this browser. **Export exhibition** downloads a JSON backup you can import on another computer. Export contains links and credits, not the artwork files. Removing a work or importing an exhibition offers Undo.
+The current queue and settings autosave locally in this browser. Open **Playlists**, give the current exhibition a name, and choose **Save playlist** to keep a separate copy. You can save up to 20 named playlists (subject to browser storage space), each with up to 150 works. **Load** restores its order and settings and offers Undo. Editing the current exhibition does not change a saved playlist; saving the same name asks you to explicitly replace it. Deleting a saved playlist also offers Undo.
+
+**Export JSON** backs up the current exhibition; each saved playlist has its own export button. **Import JSON** loads a backup into the current exhibition with Undo, then **Playlists → Save playlist** keeps it as a named copy. Backups preserve the name, artwork order, source credits, media links, rotation, and all display settings. Older ArtDrops JSON files still work. Files are limited to 2 MB and contain links and credits, not artwork files.
+
+Playlists stay in this browser on this device; they do not sync between computers, and clearing browser data removes them. Export important playlists as JSON backups before your show.
+
+Modern browsers coordinate playlist writes across tabs with Web Locks. In an older browser without that API, edit saved playlists in one tab at a time.
 
 Use **Collection** to browse a requested series, **Media** to choose moving or still art, and search to find an artist, title, or mask variant. The **Add works** button adds the current collection selection up to the 150-work exhibition limit, with Undo. **Your references · availability** links to the included reference sources and shows their verified playable entries.
 

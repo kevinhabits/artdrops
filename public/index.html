@@ -50,6 +50,7 @@
         </div>
         <aside class="exhibition-panel" id="exhibition" aria-labelledby="exhibition-title">
           <div class="panel-heading"><div><p class="eyebrow">MADE BY YOU</p><h2 id="exhibition-title">Your exhibition<span class="accent-dot">.</span></h2></div><span class="count" id="queue-count">0</span></div>
+          <button class="playlist-launch" id="playlists" type="button" aria-haspopup="dialog" aria-controls="playlists-dialog" aria-labelledby="playlist-launch-title" aria-describedby="playlist-launch-description"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14M5 10h14M5 15h8M5 20h8M18 14v6m-3-3h6"/></svg><span class="playlist-launch-copy"><strong id="playlist-launch-title">Playlists</strong><span id="playlist-launch-description">Save or load a selection</span></span><span aria-hidden="true">↗</span></button>
           <div class="hour-mix"><div class="setting-row"><label for="mix-format">Mix for</label><select id="mix-format"><option value="portrait" selected>Portrait screen · 9:16</option><option value="all">All artwork</option></select></div><p id="mix-screen-note">For your Samsung 43″ · 2160 × 3840<br>High-resolution portrait art, shown without cropping.</p><button class="button button-light" id="hour-mix" disabled aria-describedby="hour-mix-note">Build a 1-hour mix <span aria-hidden="true">↗</span></button><p id="hour-mix-note">Loading your selection…</p></div>
           <div class="queue-summary"><span id="queue-summary">Start with a few favorites</span><button class="text-button" id="clear-queue">Clear</button></div>
           <ol class="queue-list" id="queue-list" aria-label="Exhibition order"></ol>
@@ -64,7 +65,7 @@
           <button class="button button-accent start-show" id="start-show"><span class="play-icon" aria-hidden="true"></span>Start exhibition <span aria-hidden="true">↗</span></button>
           <p class="loop-note">Repeats continuously until you stop it.</p>
           <p class="save-note" id="save-note"><span class="tiny-dot" aria-hidden="true"></span>Saved on this browser</p>
-          <div class="backup-actions"><button class="text-button" id="playlists">Playlists</button><span aria-hidden="true">·</span><button class="text-button" id="export-queue">Export JSON</button><span aria-hidden="true">·</span><button class="text-button" id="import-queue">Import JSON</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
+          <div class="backup-actions"><button class="text-button" id="export-queue">Export JSON</button><span aria-hidden="true">·</span><button class="text-button" id="import-queue">Import JSON</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
         </aside>
       </div>
     </section>

@@ -1,6 +1,7 @@
 const LOAD_TIMEOUT = 15_000;
 const LOOKAHEAD = 2;
-const DURATIONS = new Set([10, 20, 30, 60, 120]);
+const HISTORY_LIMIT = 200;
+const DURATIONS = new Set([10, 20, 30, 60, 90, 120]);
 
 export function safeMediaUrl(value, origin = globalThis.location?.origin, kind = 'video') {
   if (typeof value !== 'string' || !value.trim()) return null;
@@ -75,6 +76,8 @@ export class ExhibitionPlayer {
     this.position = 0;
     this.failed = new Set();
     this.active = null;
+    this.history = [];
+    this.historyIndex = -1;
     this.pending = null;
     this.nextPlan = null;
     this.nextPlans = [];
@@ -123,7 +126,7 @@ export class ExhibitionPlayer {
       image.hidden = true;
       image.style.objectFit = this.settings.fit;
       const slot = { frame, video, image, work: null, sourceIndex: 0, watchdog: null };
-      for (const name of ['playing', 'loadeddata', 'error', 'waiting', 'stalled']) {
+      for (const name of ['playing', 'loadeddata', 'seeked', 'error', 'waiting', 'stalled']) {
         video.addEventListener(name, () => {
           if (this.opened && this.session === session) this.videoEvent(slot, name);
         }, { signal: this.controller.signal });
@@ -344,7 +347,7 @@ export class ExhibitionPlayer {
     return this.elapsed + (this.startedAt === null ? 0 : performance.now() - this.startedAt);
   }
 
-  plan(direction, from = { order: this.order, position: this.position, previousId: this.active?.work.id }) {
+  plan(direction, from = { order: this.pending?.order || this.order, position: this.pending?.position ?? this.position, previousId: this.active?.work.id }) {
     if (!from.order.length || this.failed.size >= from.order.length) return null;
     let order = from.order;
     let position = from.position;
@@ -368,14 +371,38 @@ export class ExhibitionPlayer {
 
   advance(direction) {
     if (!this.opened) return;
+    // History contains only artwork that was actually shown, including across
+    // shuffled cycles. Cancel an unshown Next before stepping farther back.
+    const history = this.history || [];
+    let index = this.pending ? this.pending.historyIndex ?? history.length : this.historyIndex;
+    for (index += direction; index >= 0 && index < history.length; index += direction) {
+      const entry = history[index];
+      if (this.failed.has(entry.order[entry.position].id)) continue;
+      this.requestWork(entry.position, null, entry, index, direction);
+      return;
+    }
+    if (direction === -1 && index < 0 && (history.length >= HISTORY_LIMIT || (this.pending && this.failed.has(this.pending.work.id)))) {
+      // A failed Back must not jump into an unshown future. At the bounded
+      // history limit, preserve the oldest known selection instead.
+      const current = history[this.historyIndex];
+      if (this.pending && this.failed.has(this.pending.work.id)) {
+        if (current && !this.failed.has(this.active?.work.id)) this.requestWork(current.position, null, current, this.historyIndex);
+        else {
+          this.pending = null;
+          this.nextPlans = [];
+          this.nextPlan = null;
+          this.advance(1);
+        }
+      }
+      return;
+    }
     const cached = direction === 1 ? this.nextPlan : null;
     const plan = cached && !this.failed.has(cached.order[cached.position].id) ? cached : this.plan(direction);
     if (!plan) return this.unavailable();
-    this.order = plan.order;
-    this.requestWork(plan.position, null, plan);
+    this.requestWork(plan.position, null, plan, null, direction);
   }
 
-  requestWork(position, sourceIndex = null, plan = null) {
+  requestWork(position, sourceIndex = null, plan = null, historyIndex = null, direction = 1) {
     if (!this.opened) return;
     // Complete the visible blend before reusing an outgoing media slot.
     this.finishTransition();
@@ -383,7 +410,8 @@ export class ExhibitionPlayer {
     const consumed = plan ? (this.nextPlans || []).indexOf(plan) : -1;
     this.nextPlans = consumed < 0 ? [] : this.nextPlans.slice(consumed + 1);
     this.nextPlan = this.nextPlans[0] || null;
-    const work = this.order[position];
+    const order = plan?.order || this.order;
+    const work = order[position];
     if (!work) return this.unavailable();
     if (work.kind === 'image') {
       this.needsPlayGesture = false;
@@ -398,7 +426,9 @@ export class ExhibitionPlayer {
         this.pending = null;
       }
       this.position = position;
+      this.order = order;
       this.active.position = position;
+      this.recordHistory(historyIndex);
       this.elapsed = 0;
       this.resumeClock();
       this.tick();
@@ -414,8 +444,8 @@ export class ExhibitionPlayer {
       this.pending.slot.video.pause();
     }
     const preparedSource = slot.work?.id === work.id ? slot.sourceIndex : 0;
-    this.position = position;
-    this.pending = { slot, work, position, sourceIndex: sourceIndex ?? preparedSource ?? 0, token: Symbol('playback') };
+    this.pending = { slot, work, position, historyIndex, order, direction,
+      sourceIndex: sourceIndex ?? preparedSource ?? 0, token: Symbol('playback') };
     this.loadPending();
     this.preloadNext();
   }
@@ -433,6 +463,11 @@ export class ExhibitionPlayer {
     slot.sourceIndex = sourceIndex;
     slot.buffering = true;
     this.setMedia(slot, work, source);
+    // A retained previous video must restart consistently. Seek only while its
+    // frame is hidden; a paused navigation waits for the new decoded frame.
+    if (work.kind !== 'image' && slot.video.currentTime > 0) {
+      try { slot.video.currentTime = 0; } catch { /* A not-yet-loaded video already starts at zero. */ }
+    }
     if (!this.active) {
       this.message.hidden = false;
       this.message.textContent = `Loading ${work.title || 'artwork'}…`;
@@ -440,7 +475,7 @@ export class ExhibitionPlayer {
     this.watch(slot, deadline);
     if (work.kind === 'image') { this.imageEvent(slot, 'load'); return; }
     if (!this.paused) this.play(slot, pending.token);
-    else if (!this.needsPlayGesture && slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
+    else if (!this.needsPlayGesture && !slot.video.seeking && slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
   }
 
   play(slot, token = null) {
@@ -493,7 +528,12 @@ export class ExhibitionPlayer {
       if (slot.preloading) { if (!this.ready(slot)) this.failPreload(slot); return; }
       if (this.needsPlayGesture || (this.paused && this.pending?.slot !== slot)) return;
       if (this.pending?.slot === slot) this.failPending();
-      else if (this.active === slot && !this.pending) this.failActive();
+      else if (this.active === slot && !this.pending) {
+        if (this.observeProgress(slot)) return;
+        const remaining = LOAD_TIMEOUT - (performance.now() - slot.lastProgressAt);
+        if (remaining > 0 && !slot.video.paused) this.watch(slot, performance.now() + remaining);
+        else this.failActive();
+      }
     }, Math.max(0, slot.loadDeadline - performance.now()));
     slot.watchdog = watchdog;
   }
@@ -505,12 +545,16 @@ export class ExhibitionPlayer {
 
   videoEvent(slot, event) {
     if (slot.work?.kind === 'image') return;
-    if (event === 'loadeddata') {
+    if (event === 'loadeddata' || event === 'seeked') {
       if (slot.preloading && slot.video.videoWidth) this.clearWatch(slot);
-      if (this.paused && !this.needsPlayGesture && this.pending?.slot === slot && slot.video.videoWidth) this.promote();
+      if (this.paused && !this.needsPlayGesture && !slot.video.seeking && this.pending?.slot === slot && slot.video.videoWidth) this.promote();
+      else if (event === 'seeked' && this.pending?.slot === slot && slot.video.readyState >= 3) this.videoEvent(slot, 'playing');
       return;
     }
     if (event === 'playing') {
+      if (slot.video.paused || slot.video.seeking || (this.paused && !this.needsPlayGesture)) return;
+      // An event queued by the previous source can arrive after slot reuse.
+      if (slot.video.readyState < 2) return;
       if (!slot.video.videoWidth) {
         if (this.pending?.slot === slot) this.failPending();
         else if (this.active === slot && !this.pending) this.failActive();
@@ -543,6 +587,7 @@ export class ExhibitionPlayer {
     }
     // A stalled download can still have enough buffered video to keep playing.
     if (event === 'stalled' && slot.video.readyState >= 3) return;
+    if (this.paused || slot.video.paused) return;
     if (slot === this.active || slot === this.pending?.slot) {
       slot.buffering = true;
       if (slot === this.active) this.freezeClock();
@@ -557,9 +602,12 @@ export class ExhibitionPlayer {
     const slot = pending.slot;
     this.clearWatch(slot);
     slot.position = pending.position;
+    this.position = pending.position;
+    this.order = pending.order || this.order;
     this.active = slot;
     slot.preloading = false;
     this.pending = null;
+    this.recordHistory(pending.historyIndex, pending.order, pending.direction);
     this.elapsed = 0;
     this.startedAt = null;
     this.message.hidden = true;
@@ -569,6 +617,26 @@ export class ExhibitionPlayer {
     this.resumeClock();
     this.tick();
     this.beginTransition(slot, previous);
+  }
+
+  recordHistory(index = null, order = this.order, direction = 1) {
+    this.history ||= [];
+    if (index !== null && index !== undefined && this.history[index]) {
+      this.historyIndex = index;
+      return;
+    }
+    const entry = this.history[this.historyIndex];
+    if (entry?.order[entry.position].id === this.active.work.id) return;
+    if (direction === -1) {
+      this.history.unshift({ order, position: this.active.position });
+      if (this.history.length > HISTORY_LIMIT) this.history.pop();
+      this.historyIndex = 0;
+      return;
+    }
+    this.history = this.history.slice(0, (this.historyIndex ?? -1) + 1);
+    this.history.push({ order, position: this.active.position });
+    if (this.history.length > HISTORY_LIMIT) this.history.shift();
+    this.historyIndex = this.history.length - 1;
   }
 
   transitionDuration() {
@@ -626,9 +694,11 @@ export class ExhibitionPlayer {
 
   preloadNext() {
     if (!this.opened || (!this.active && !this.pending)) return;
-    const previousPlans = this.nextPlans || [];
+    const historyIndex = this.pending ? this.pending.historyIndex : this.historyIndex;
+    const forward = Number.isInteger(historyIndex) ? (this.history || []).slice(historyIndex + 1, historyIndex + 1 + LOOKAHEAD) : [];
+    const previousPlans = forward.length ? forward : this.nextPlans || [];
     this.nextPlans = previousPlans.filter((plan) => !this.failed.has(plan.order[plan.position].id));
-    let cursor = previousPlans.at(-1) || { order: this.order, position: this.position };
+    let cursor = previousPlans.at(-1) || { order: this.pending?.order || this.order, position: this.pending?.position ?? this.position };
     const fillPlans = () => {
       while (this.nextPlans.length < LOOKAHEAD) {
         const plan = this.plan(1, { ...cursor, previousId: cursor.order[cursor.position]?.id });
@@ -653,19 +723,33 @@ export class ExhibitionPlayer {
       }
     }
     this.nextPlan = this.nextPlans[0] || null;
-    const protectedSlots = new Set([this.active, this.pending?.slot, this.fadeState?.outgoing]);
-    const wanted = new Set(this.nextPlans.map((plan) => plan.order[plan.position].id));
-    for (const slot of this.slots) {
-      if (!protectedSlots.has(slot) && slot.work && !wanted.has(slot.work.id)) this.clearSlot(slot);
+    // Warm actual history neighbors before a second speculative future item.
+    // At startup there is no previous artwork, so both spare slots look ahead.
+    const history = this.history || [];
+    const previousIndex = this.pending ? this.pending.historyIndex ?? history.length : this.historyIndex;
+    let previousPlan;
+    for (let index = previousIndex - 1; index >= 0; index--) {
+      const entry = history[index];
+      if (!this.failed.has(entry.order[entry.position].id)) { previousPlan = entry; break; }
     }
-    const reserved = new Set(protectedSlots);
-    for (const plan of this.nextPlans) {
-      const work = plan.order[plan.position];
-      if ([...protectedSlots].some((slot) => slot?.work?.id === work.id)) continue;
-      let slot = this.slots.find((candidate) => !reserved.has(candidate) && candidate.work?.id === work.id);
-      if (!slot) slot = this.slots.find((candidate) => !reserved.has(candidate) && !candidate.work)
-        || this.slots.find((candidate) => !reserved.has(candidate));
-      if (!slot) continue;
+    const seen = new Set();
+    const desired = [this.nextPlans[0], previousPlan, ...this.nextPlans.slice(1)].filter((plan) => {
+      if (!plan) return false;
+      const id = plan.order[plan.position].id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const protectedSlots = new Set([this.active, this.pending?.slot, this.fadeState?.outgoing]);
+    const available = this.slots.filter(slot => !protectedSlots.has(slot));
+    const targets = desired.map(plan => plan.order[plan.position])
+      .filter(work => ![...protectedSlots].some(slot => slot?.work?.id === work.id)).slice(0, available.length);
+    const matches = new Map(targets.map(work => [work.id, available.find(slot => slot.work?.id === work.id)]));
+    const reserved = new Set([...protectedSlots, ...matches.values()]);
+    const wanted = new Set(targets.map(work => work.id));
+    for (const slot of available) if (slot.work && !wanted.has(slot.work.id)) this.clearSlot(slot);
+    for (const work of targets) {
+      const slot = matches.get(work.id) || available.find(candidate => !reserved.has(candidate));
       reserved.add(slot);
       if (slot.work?.id === work.id && slot.preloading) continue;
       const sourceIndex = slot.work?.id === work.id ? slot.sourceIndex || 0 : 0;
@@ -721,6 +805,7 @@ export class ExhibitionPlayer {
     }
     this.failed.add(pending.work.id);
     this.onStatus?.(`Skipped “${pending.work.title || 'Untitled'}”: its media could not load.`);
+    if (pending.direction === -1) { this.advance(-1); return; }
     this.pending = null;
     this.preloadNext();
     this.advance(1);
@@ -770,13 +855,24 @@ export class ExhibitionPlayer {
     this.showControls();
   }
 
+  observeProgress(slot) {
+    if (slot.video.paused || slot.video.seeking || slot.video.currentTime === slot.lastTime) return false;
+    slot.lastTime = slot.video.currentTime;
+    slot.lastProgressAt = performance.now();
+    // Loop seeks can emit waiting without a subsequent playing event. Actual
+    // decoded progress is sufficient to clear that stall and resume the clock.
+    if (slot.video.readyState >= 2) {
+      slot.buffering = false;
+      this.clearWatch(slot);
+      this.resumeClock();
+    }
+    return true;
+  }
+
   tick() {
     if (!this.opened || !this.active) return;
     if (this.active.work?.kind !== 'image' && !this.paused && !this.pending && !document.hidden) {
-      if (this.active.video.currentTime !== this.active.lastTime) {
-        this.active.lastTime = this.active.video.currentTime;
-        this.active.lastProgressAt = performance.now();
-      } else if (performance.now() - this.active.lastProgressAt >= LOAD_TIMEOUT) {
+      if (!this.observeProgress(this.active) && performance.now() - this.active.lastProgressAt >= LOAD_TIMEOUT) {
         this.failActive();
         return;
       }
@@ -806,7 +902,7 @@ export class ExhibitionPlayer {
       for (const slot of this.slots) { slot.video.pause(); if (!slot.preloading) this.clearWatch(slot); }
       if (this.pending) {
         const slot = this.pending.slot;
-        if (slot.work?.kind === 'image' ? slot.imageReady : slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
+        if (slot.work?.kind === 'image' ? slot.imageReady : !slot.video.seeking && slot.video.readyState >= 2 && slot.video.videoWidth) this.promote();
         else this.watch(slot);
       }
     } else if (this.pending) {
@@ -961,6 +1057,8 @@ export class ExhibitionPlayer {
     this.dialog?.remove();
     document.body.style.overflow = this.previousOverflow;
     this.active = null;
+    this.history = [];
+    this.historyIndex = -1;
     this.pending = null;
     this.nextPlan = null;
     this.nextPlans = [];

@@ -35,7 +35,7 @@ export function cleanWork(work) {
   };
 }
 export function cleanSettings(settings = {}) {
-  return { duration: [10, 20, 30, 60, 120].includes(Number(settings?.duration)) ? Number(settings.duration) : 30,
+  return { duration: [10, 20, 30, 60, 90, 120].includes(Number(settings?.duration)) ? Number(settings.duration) : 30,
     fit: settings?.fit === 'cover' ? 'cover' : 'contain', transition: settings?.transition === 'none' ? 'none' : 'fade',
     captions: settings?.captions !== false, shuffle: settings?.shuffle === true };
 }

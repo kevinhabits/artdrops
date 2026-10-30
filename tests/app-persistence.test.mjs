@@ -65,6 +65,28 @@ test('the actual exported Blob imports into another app instance and Undo restor
   assert.deepEqual(await snapshot(destination), previous);
 });
 
+test('90 seconds survives settings reload, JSON transfer and named playlist save/load', async () => {
+  const app = await boot();
+  await app.change('duration', '90');
+  assert.equal(JSON.parse(app.storage.get(STORAGE_KEY)).settings.duration, 90);
+  const reloaded = await appHarness({ storage: app.storage, catalog });
+  assert.equal(reloaded.node('duration').value, '90');
+  const backup = await reloaded.exportFile();
+  assert.equal(backup.json.settings.duration, 90);
+  const destination = await boot();
+  await destination.importFile(backup.blob);
+  assert.equal(destination.node('duration').value, '90');
+  await saveCurrent(destination, '90-second show');
+  assert.equal(savedEntries(destination)[0].exhibition.settings.duration, 90);
+  await destination.change('duration', '30');
+  const savedReload = await appHarness({ storage: destination.storage, catalog });
+  assert.equal(savedReload.node('duration').value, '30');
+  await savedReload.click('playlists');
+  await playlistButton(savedReload, 'Load 90-second show').click();
+  assert.equal(savedReload.node('duration').value, '90');
+  assert.equal((await snapshot(savedReload)).settings.duration, 90);
+});
+
 test('invalid JSON and invalid artwork imports leave the working exhibition and storage unchanged', async () => {
   const app = await boot();
   const before = await snapshot(app);

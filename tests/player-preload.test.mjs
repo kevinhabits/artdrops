@@ -106,7 +106,8 @@ test('two upcoming works start loading before the first frame and retain their r
   assert.equal(first.work.id, 'a', 'the outgoing artwork remains untouched throughout the fade');
   assert.equal(slotFor('c'), third);
   t.mock.timers.tick(1500);
-  assert.equal(first.work.id, 'd');
+  assert.equal(first.work.id, 'a', 'keep the real previous artwork warm after the fade');
+  assert.equal(slotFor('d'), undefined, 'the bounded third slot prioritizes Back over a second future artwork');
   assert.equal(first.video.loads.at(-1).visible, false);
   assert.equal(slots.length, 3);
 });
@@ -276,3 +277,287 @@ test('a late play rejection cannot affect an image that reuses the same media sl
   assert.equal(player.paused, false);
   assert.equal(player.failed.size, 0);
 });
+
+for (const duringFade of [true, false]) {
+  test(`Back ${duringFade ? 'during' : 'after'} the fade reuses and rewinds the real previous video`, async (t) => {
+    const { player, slots, slotFor, ready, show } = fixture(t, ['a', 'b', 'c', 'd'].map(id => work(id)));
+    player.requestWork(0); await show();
+    const first = player.active;
+    first.video.currentTime = 9.8;
+    await ready(slotFor('b')); await ready(slotFor('c'));
+    player.advance(1); await show();
+    if (!duringFade) t.mock.timers.tick(1500);
+    const loads = first.video.loads.length;
+    player.advance(-1);
+    assert.equal(player.pending.slot, first);
+    assert.equal(first.video.currentTime, 0);
+    assert.equal(first.video.loads.length, loads);
+    await show();
+    assert.equal(player.active.work.id, 'a');
+    assert.equal(player.historyIndex, 0);
+    player.advance(1); await show();
+    assert.equal(player.active.work.id, 'b');
+    assert.deepEqual(player.history.map(entry => entry.order[entry.position].id), ['a', 'b']);
+    assert.ok(slots.every(slot => slot.video.loads.every(load => !load.visible)));
+  });
+}
+
+test('paused Back waits for the rewound decoded frame and stale playing cannot promote it', async (t) => {
+  const { player, slotFor, ready, show } = fixture(t, ['a', 'b', 'c'].map(id => work(id)));
+  player.requestWork(0); await show();
+  const first = player.active;
+  first.video.currentTime = 12;
+  await ready(slotFor('b')); await ready(slotFor('c'));
+  player.advance(1); await show(); player.finishTransition(true);
+  const second = player.active;
+  player.togglePause();
+  let time = first.video.currentTime;
+  Object.defineProperty(first.video, 'currentTime', {
+    configurable: true, get: () => time,
+    set(value) { time = value; first.video.seeking = true; },
+  });
+  player.advance(-1);
+  assert.equal(player.active, second);
+  assert.equal(first.video.currentTime, 0);
+  player.videoEvent(first, 'playing');
+  player.videoEvent(first, 'loadeddata');
+  assert.equal(player.active, second);
+  first.video.seeking = false;
+  player.videoEvent(first, 'seeked');
+  assert.equal(player.active, first);
+  assert.equal(player.pending, null);
+  assert.equal(player.paused, true);
+  assert.ok(player.slots.every(slot => slot.video.paused));
+});
+
+test('Back and Next replay actual shown history across shuffled boundaries', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { player, show } = fixture(t, ['a', 'b', 'c'].map(id => work(id)), { shuffle: true, transition: 'none' });
+  player.requestWork(0); await show();
+  const shown = ['a'];
+  for (let i = 0; i < 6; i++) {
+    player.advance(1); await show();
+    shown.push(player.active.work.id);
+  }
+  for (let i = shown.length - 2; i >= 0; i--) {
+    player.advance(-1); if (player.pending) await show();
+    assert.equal(player.active.work.id, shown[i]);
+  }
+  for (let i = 1; i < shown.length; i++) {
+    player.advance(1); if (player.pending) await show();
+    assert.equal(player.active.work.id, shown[i]);
+  }
+  assert.equal(player.history.length, shown.length);
+});
+
+test('Back prepares the older history neighbor while preserving its forward neighbor', async (t) => {
+  const { player, slotFor, show } = fixture(t, ['a', 'b', 'c', 'd', 'e'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  player.advance(1); await show();
+  player.advance(1); await show();
+  const third = player.active;
+  player.advance(-1); await show();
+  assert.equal(player.active.work.id, 'b');
+  assert.equal(slotFor('c'), third);
+  assert.ok(slotFor('a')?.preloading);
+  assert.equal(slotFor('d'), undefined);
+});
+
+test('Next then Back cancels an unshown item; repeated Next advances the requested cursor', async (t) => {
+  const { player, show } = fixture(t, ['a', 'b', 'c', 'd'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  player.advance(1); await show();
+  const active = player.active;
+  player.advance(1);
+  const abandoned = player.pending.slot;
+  assert.equal(player.pending.work.id, 'c');
+  player.advance(-1);
+  assert.equal(player.active, active);
+  assert.equal(player.pending, null);
+  player.videoEvent(abandoned, 'playing');
+  assert.equal(player.active, active);
+  player.advance(1); player.advance(1);
+  assert.equal(player.pending.work.id, 'd');
+  assert.equal(player.position, 1, 'visible selection changes only on promotion');
+  await show();
+  assert.deepEqual(player.history.map(entry => entry.order[entry.position].id), ['a', 'b', 'd']);
+});
+
+test('a failed Back keeps going backward through history rather than jumping forward', async (t) => {
+  const { player, show, error } = fixture(t, ['a', 'b', 'c', 'd'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  player.advance(1); await show();
+  player.advance(1); await show();
+  player.advance(-1);
+  assert.equal(player.pending.work.id, 'b');
+  error(player.pending.slot);
+  assert.equal(player.pending.work.id, 'a');
+  await show();
+  assert.equal(player.active.work.id, 'a');
+  player.advance(1); await show();
+  assert.equal(player.active.work.id, 'c', 'forward history skips the failed artwork');
+});
+
+test('loop progress recovers waiting without a playing event, reload or new fade', async (t) => {
+  const { player, show, elapse } = fixture(t, [work('a')], { duration: 90, transition: 'none' });
+  player.requestWork(0); await show();
+  const active = player.active, loads = active.video.loads.length;
+  elapse(9900); active.video.currentTime = 9.9; player.tick();
+  elapse(100); player.videoEvent(active, 'waiting');
+  assert.equal(player.startedAt, null);
+  active.video.currentTime = 0.1;
+  elapse(100); player.tick();
+  assert.equal(active.buffering, false);
+  assert.equal(active.watchdog, null);
+  assert.notEqual(player.startedAt, null);
+  for (let seconds = 1; seconds <= 70; seconds++) {
+    elapse(1000); active.video.currentTime = seconds % 10 + 0.1; player.tick();
+    player.videoEvent(active, 'playing');
+  }
+  assert.equal(player.active, active);
+  assert.equal(player.failed.size, 0);
+  assert.equal(player.fadeState, null);
+  assert.equal(active.video.loads.length, loads);
+  assert.equal(player.clockElapsed(), 80_000);
+});
+
+test('Resume recovers from missing playing events based on progress and a true stall still times out', async (t) => {
+  const { player, show, elapse } = fixture(t, [work('a')], { duration: 90, transition: 'none' });
+  player.requestWork(0); await show();
+  const active = player.active;
+  player.togglePause(); player.togglePause();
+  assert.notEqual(active.watchdog, null);
+  elapse(100); active.video.currentTime = 0.1; player.tick();
+  assert.equal(active.watchdog, null);
+  assert.notEqual(player.startedAt, null);
+  player.videoEvent(active, 'waiting');
+  elapse(15_000);
+  assert.equal(player.failed.has('a'), true);
+  assert.equal(player.active, null);
+});
+
+test('a watchdog does not skip media whose progress was already observed by the preceding tick', async (t) => {
+  const { player, show, elapse } = fixture(t, [work('a')], { duration: 90, transition: 'none' });
+  player.requestWork(0); await show();
+  const active = player.active;
+  elapse(14_900); active.video.currentTime = 4.9; player.tick();
+  player.watch(active, performance.now() + 100);
+  elapse(100);
+  assert.equal(player.failed.size, 0);
+  assert.equal(player.active, active);
+  assert.equal(active.loadDeadline, active.lastProgressAt + 15_000);
+});
+
+test('a two-work queue never loads a duplicate of its shared previous/next neighbor', async (t) => {
+  const { player, slots, show } = fixture(t, [work('a'), work('b')], { transition: 'none' });
+  player.requestWork(0); await show();
+  for (let count = 0; count < 6; count++) {
+    player.advance(count % 2 ? -1 : 1); await show();
+    const ids = slots.map(slot => slot.work?.id).filter(Boolean);
+    assert.equal(ids.length, new Set(ids).size);
+    assert.equal(slots.filter(slot => slot.work?.id === 'a').length, 1);
+    assert.equal(slots.filter(slot => slot.work?.id === 'b').length, 1);
+  }
+  assert.equal(slots.flatMap(slot => slot.video.loads).filter(load => load.source).length, 2);
+});
+
+test('forward preparation reserves the existing previous slot before replacing any cached neighbor', async (t) => {
+  const { player, slots, show } = fixture(t, ['a', 'b', 'c', 'd'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  for (let count = 0; count < 9; count++) {
+    const previous = player.active, source = previous.video.src;
+    const loadsBefore = slots.flatMap(slot => slot.video.loads).filter(load => load.source === source).length;
+    player.advance(1); await show();
+    assert.equal(previous.work.id, player.history[player.historyIndex - 1].order[player.history[player.historyIndex - 1].position].id);
+    assert.equal(previous.video.src, source);
+    assert.equal(slots.flatMap(slot => slot.video.loads).filter(load => load.source === source).length, loadsBefore);
+  }
+});
+
+test('fresh-session backward wraps keep their direction and Next retraces them', async (t) => {
+  const { player, show } = fixture(t, ['a', 'b', 'c', 'd'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  player.advance(-1); await show();
+  assert.equal(player.active.work.id, 'd');
+  player.advance(-1); await show();
+  assert.equal(player.active.work.id, 'c');
+  player.advance(1); await show();
+  assert.equal(player.active.work.id, 'd');
+  player.advance(1); await show();
+  assert.equal(player.active.work.id, 'a');
+});
+
+test('a failed oldest Back returns to the shown artwork without jumping forward', async (t) => {
+  const { player, show, error } = fixture(t, ['a', 'b', 'c'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  player.advance(1); await show();
+  const current = player.active;
+  player.advance(-1); error(player.pending.slot);
+  assert.equal(player.active, current);
+  assert.equal(player.pending, null);
+  assert.equal(player.active.work.id, 'b');
+});
+
+test('a completed rewind can promote even when playing arrived before seeked', async (t) => {
+  const { player, show } = fixture(t, ['a', 'b', 'c'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0); await show();
+  const first = player.active;
+  player.advance(1); await show();
+  player.advance(-1);
+  first.video.seeking = true;
+  player.videoEvent(first, 'playing');
+  assert.equal(player.active.work.id, 'b');
+  first.video.seeking = false;
+  player.videoEvent(first, 'seeked');
+  assert.equal(player.active, first);
+  assert.equal(player.pending, null);
+});
+
+test('a stale playing event cannot fail an unready replacement source', async (t) => {
+  const { player, show } = fixture(t, ['a', 'b', 'c'].map(id => work(id)), { transition: 'none' });
+  player.requestWork(0);
+  const pending = player.pending;
+  assert.equal(pending.slot.video.readyState, 0);
+  player.videoEvent(pending.slot, 'playing');
+  assert.equal(player.pending, pending);
+  assert.equal(player.failed.size, 0);
+  await show();
+  assert.equal(player.active.work.id, 'a');
+});
+
+test('long-running navigation keeps history and media slots bounded', async (t) => {
+  const { player, slots, show } = fixture(t, ['a', 'b', 'c'].map(id => work(id)), { shuffle: true, transition: 'none' });
+  player.requestWork(0); await show();
+  for (let count = 0; count < 220; count++) { player.advance(1); await show(); }
+  assert.equal(player.history.length, 200);
+  assert.equal(player.historyIndex, 199);
+  assert.equal(slots.length, 3);
+  for (let count = 0; count < 199; count++) { player.advance(-1); await show(); }
+  const oldest = player.active;
+  player.advance(-1);
+  assert.equal(player.active, oldest);
+  assert.equal(player.pending, null);
+  assert.equal(player.historyIndex, 0);
+});
+
+for (const hasHealthySuccessor of [false, true]) {
+  test(`failed Back with a failed visible artwork ${hasHealthySuccessor ? 'finds a healthy successor' : 'ends unavailable'} instead of hanging`, async (t) => {
+    const ids = hasHealthySuccessor ? ['a', 'b', 'c'] : ['a', 'b'];
+    const { player, show, error } = fixture(t, ids.map(id => work(id)), { transition: 'none' });
+    player.requestWork(0); await show();
+    player.advance(1); await show();
+    player.failActive();
+    player.advance(-1);
+    assert.equal(player.pending.work.id, 'a');
+    error(player.pending.slot);
+    if (hasHealthySuccessor) {
+      assert.equal(player.pending.work.id, 'c');
+      await show();
+      assert.equal(player.active.work.id, 'c');
+    } else {
+      assert.equal(player.pending, null);
+      assert.equal(player.active, null);
+      assert.equal(player.counter.textContent, 'Playback unavailable');
+    }
+  });
+}

@@ -1,6 +1,17 @@
 # Release verification
 
-Latest presentation-preloading checks were completed on 2026-10-30. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+Latest loop and navigation reliability checks were completed on 2026-10-31. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+
+## 2026-10-31 — 90-second slots and loop/navigation reliability
+
+- Added **90 seconds** to Time with each work. The default remains 30 seconds. The value survives autosave/reload, named playlist save/load, and a real exported JSON Blob imported into another app instance.
+- Fixed three reproduced app defects: Back crossed shuffled boundaries using the wrong order; retained videos could reveal their old playhead on a paused revisit; a recovered buffering notification could freeze the exhibition timer and falsely skip a still-decoding video after 15 seconds.
+- The three-slot pool now prioritizes the current artwork and its actual previous/next neighbors. Startup can still prepare two future works. Existing neighbor elements are reserved before eviction, including two-work queues. Incoming videos rewind while hidden and wait for the seek to finish before appearing. Late media events cannot interrupt a replacement still loading.
+- Navigation records up to 200 recent history entries, commits the new selection only on promotion, preserves direction when a previous work fails, and cancels unshown navigation safely. Recovered media progress clears stale watchdogs and restarts the exhibition clock. Native repeat events do not reset the work's duration or restart its fade.
+- All **149 Node tests** and the static production build pass. Added regressions cover saved 90-second settings, shuffled history, paused rewind event order, rapid cancellation, repeated warm Back, two-work deduplication, forward/backward wraparound, bounded history, recovered pause/buffering, late playback events, directional failures, and double-failure recovery. Existing four-hour accelerated playback and three-slot bounds continue to pass.
+- Headless Chromium checks use real silent 10-second portrait and 20-second square clips from the checked catalog. A full 90-second slot spans native video repeats, followed by automatic advancement; checks also cover paused Back/Next, rapid alternating navigation, shuffled-boundary Back/Forward, source reuse, and close cleanup. The actual app selector persists 90 seconds across reload and starts a show with a 90-second counter.
+- In the baseline, a deterministic shuffled sequence `[b, c, d, a, c]` returned to `b` on Back instead of `a`. A separate explicitly synthetic delayed `waiting` event reproduced the recovery race while real video time advanced from 0.417 to 8.421 seconds: the old timer remained frozen and then incorrectly skipped the video. This injected event models an event-ordering edge; it is not evidence that every native loop fails.
+- All browser checks run in an isolated headless context with audio muted and fullscreen/wake-lock APIs disabled. No user browser storage or display state is changed. Other browser engines and the physical Samsung display were not available for these checks; an uninterrupted four-hour hardware screening remains untested. Source videos may still have an artistic end/start cut or codec-dependent loop seam; these changes address player-generated reload, timing, and navigation failures.
 
 ## 2026-10-30 — earlier presentation preloading
 

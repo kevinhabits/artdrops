@@ -130,6 +130,13 @@ test('Start requests media before fullscreen and fullscreens the entire player i
   assert.equal(player.fullscreenButton.textContent, 'Exit fullscreen');
 });
 
+test('the player accepts a 90-second artwork duration without changing silent defaults', (context) => {
+  const { player } = browserHarness(context, 'unavailable');
+  player.open([artwork('first')], { duration: 90 });
+  assert.equal(player.settings.duration, 90);
+  assert.ok(player.slots.every(slot => slot.video.muted && slot.video.defaultMuted && slot.video.loop));
+});
+
 for (const mode of ['throw', 'denied']) {
   test(`a ${mode === 'throw' ? 'synchronous fullscreen error' : 'rejected fullscreen promise'} cannot abort Start`, async (context) => {
     const { document, events, player, start, beginPlaying, closes } = browserHarness(context, mode);

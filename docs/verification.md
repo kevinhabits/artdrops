@@ -1,6 +1,15 @@
 # Release verification
 
-Latest playlist and JSON checks were completed on 2026-10-26. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+Latest presentation-preloading checks were completed on 2026-10-30. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+
+## 2026-10-30 — earlier presentation preloading
+
+- All 128 Node tests and the static production build pass. Focused regressions cover two-work lookahead, prepared-source reuse, background fallback/timeouts, the original timeout deadline on handoff, shuffled boundaries after failures, rapid navigation, paused preparation, stale callbacks, close cleanup, and the fixed three-slot bound over four simulated hours.
+- The player uses three reusable media slots to prepare up to two upcoming works automatically. Background preparation handles errors, alternate sources, and timeouts before a work is due, then retains its prepared element and selected source for display. Only two layers participate in a fade; the outgoing layer is protected until the fade finishes.
+- Collection video sources are released while an exhibition runs, including loaded previews that have scrolled out of view. Closing restores visible previews using their working source. Inert application tests cover source release, muted requests, alternate-source preservation, and stale-error suppression.
+- A hidden native-browser check used the real player and local silent media: a delayed image, a video with an intentionally broken primary URL, and an alternate video delayed by 3.5 seconds. Before the change, that video's handoff waited 3,538 ms; with early preparation, it took 3 ms. The delayed image and next image each took 2 ms, and the next loop's first video took 3 ms. These are controlled fixture measurements, not a guarantee for remote artwork hosts.
+- Native browser checks also covered paused Next/Previous navigation and closing the player. All videos remained muted; closing removed every media source. The test subclass disabled fullscreen and wake-lock requests before playback, and the browser stayed hidden throughout. Production fullscreen and the physical Samsung display were not exercised.
+- Preloading is bounded and relies on native browser media buffering. It does not download the complete library or provide offline playback; slow or unavailable media hosts can still affect a show.
 
 ## 2026-10-26 — named playlists and reliable JSON backups
 

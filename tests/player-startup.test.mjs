@@ -113,6 +113,8 @@ function browserHarness(context, fullscreen = 'success') {
 test('Start requests media before fullscreen and fullscreens the entire player inside its modal', async (context) => {
   const { document, events, player, start } = browserHarness(context);
   start();
+  assert.equal(player.slots.length, 3);
+  assert.ok(player.slots.every(slot => slot.video.muted && slot.video.defaultMuted));
   await flushPromises();
   const playIndex = events.findIndex(event => event.type === 'media-play');
   const fullscreenIndex = events.findIndex(event => event.type === 'fullscreen-request');

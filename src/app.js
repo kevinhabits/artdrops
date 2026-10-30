@@ -76,7 +76,12 @@ function syncSources() {
   collectionSelect.value = counts.has(currentCollection) ? currentCollection : 'all';
 }
 
-function stopPreviews() { observed.forEach(video => video.pause()); }
+function stopPreviews(release = false) {
+  observed.forEach(video => {
+    video.pause();
+    if (release && video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
+  });
+}
 function syncPreviews() {
   let playing = 0;
   for (const video of observed) {
@@ -121,8 +126,9 @@ function previewVideo(work, container) {
   if (work.posterUrl) video.poster = work.posterUrl;
   let triedAlternate = false;
   video.addEventListener('error', () => {
+    if (activeShow || !video.getAttribute('src')) return;
     if (work.alternateMediaUrl && !triedAlternate) {
-      triedAlternate = true; video.src = work.alternateMediaUrl; video.load();
+      triedAlternate = true; video.dataset.src = work.alternateMediaUrl; video.src = work.alternateMediaUrl; video.load();
       if (!activeShow && inView.has(video)) video.play().catch(() => {});
       return;
     }
@@ -160,7 +166,7 @@ const player = new ExhibitionPlayer({
 function play(works) {
   if (!works.length) { notify('Add an artwork to your exhibition first.'); return; }
   lastFocus = document.activeElement;
-  activeShow = true; stopPreviews();
+  activeShow = true; stopPreviews(true);
   try { player.open(works, settings); }
   catch (error) {
     player.close();

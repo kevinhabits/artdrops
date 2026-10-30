@@ -202,9 +202,9 @@ test('shuffle keeps the last healthy work playing when the rest of the cycle has
 
 // Exercise the real loading, promotion, preloading, timer advancement and
 // failure paths. Only the browser's network and video elements are simulated.
-function simulatedExhibition(works) {
+function simulatedExhibition(works, slotCount = 2) {
   const player = new ExhibitionPlayer();
-  const slots = [0, 1].map(() => {
+  const slots = Array.from({ length: slotCount }, () => {
     const classes = new Set();
     return {
     watchdog: null,
@@ -414,12 +414,12 @@ for (const unavailableCount of [0, 12]) {
       return seed / 2 ** 32;
     });
     const original = globalThis.document;
-    // No transition may allocate extra video nodes after the two-slot setup.
+    // No transition may allocate extra video nodes after the three-slot setup.
     globalThis.document = { hidden: false, createElement() { assert.fail('unexpected DOM allocation during playback'); } };
     const works = Array.from({ length: 120 + unavailableCount }, (_, index) => work(`work-${index}`));
     const unavailable = new Set(works.slice(120).map((item) => item.id));
     const expected = works.slice(0, 120).map((item) => item.id).sort();
-    const player = simulatedExhibition(works);
+    const player = simulatedExhibition(works, 3);
     const videos = new Set(player.slots.map((slot) => slot.video));
     const cycles = [];
     const failures = new Map();
@@ -447,7 +447,7 @@ for (const unavailableCount of [0, 12]) {
         cycles.at(-1).push(id);
         previousId = id;
         assert.equal(videos.has(player.active.video), true);
-        assert.equal(player.slots.length, 2);
+        assert.equal(player.slots.length, 3);
         assert.equal(player.active.video.src, player.active.work.mediaUrl);
         player.preloadNext();
         assert.equal(videos.has(player.slots.find((candidate) => candidate !== player.active).video), true);

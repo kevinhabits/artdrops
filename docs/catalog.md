@@ -1,6 +1,8 @@
 # Artwork catalog
 
-ArtDrops' original catalog is a curated snapshot of 167 moving artworks by 123 artist identities, drawn from public objkt and Verse records. It is an editorial selection for exploring exhibition playback, not a sales ranking or a live marketplace feed. These entries stream the original source-hosted media. This document covers `public/catalog.json`; newer requested collections and the creator-authorized hosted cherry-blossom copy are documented in [reference import status](reference-import.md).
+ArtDrops' base catalog is a curated snapshot of 149 moving artworks by 111 artist identities, drawn from public objkt and Verse records. It is an editorial selection for exploring exhibition playback, not a sales ranking or a live marketplace feed. These entries stream the original source-hosted media. This document covers `public/catalog.json`; newer requested collections and the creator-authorized hosted cherry-blossom copy are documented in [reference import status](reference-import.md).
+
+Curation updated on **2026-10-31**: the website removed all 25 works then labeled **4K PORTRAIT**—18 videos from this catalog and seven stills from the reference library. The combined library now has **1,732 options** (149 base + 1,583 references). This was a selection change, not a fresh media check; the retained base videos keep their **2026-10-15** verification dates. The offline package was not changed.
 
 ## Provenance and selection
 
@@ -28,13 +30,13 @@ Example metadata query (the public API caps results at 500):
 
 ## Exhibition length
 
-The portrait preset selects **60 distinct works at 60 seconds each**, providing a nominal one-hour program for the Samsung screen used vertically. Four shuffled passes provide approximately four hours, plus any loading time. These 60 works represent 53 artist identities and include **18 native 2160 × 3840 videos**. The other selected sources meet at least 1080 × 1920 and use the display's resolution through scaling; they are not described as native 4K.
+The portrait preset now selects **40 distinct works at 90 seconds each**, providing a nominal one-hour program for the Samsung screen used vertically. It draws from **50 portrait-qualified works** across the whole library: 42 videos here and eight works in the reference library. Four shuffled passes provide approximately four hours, plus any loading time. The sources meet at least 1080 × 1920 and scale to the display while preserving their proportions.
 
 A work qualifies for the portrait program when its decoded width is at least 1080, its height at least 1920, and its aspect-ratio coverage of a 9:16 display is at least 90% (with a floating-point tolerance of 1e-9). Coverage is `min((width / height) / (9 / 16), (9 / 16) / (width / height))`. Thus 1200 × 1920 qualifies. The player uses contain fitting, preserving the artwork without cropping; near-matching ratios can leave narrow borders.
 
-The mixed-format preset remains 120 distinct works at 30 seconds each. The full catalog contains 167 selections across abstract animation, generative art, moving illustration, and stylized environments. Short source clips loop within their allotted slot; longer films play an excerpt. Program duration is not a claim that one hour of unique source footage is included.
+The mixed-format preset remains 120 distinct works at 30 seconds each. The base catalog contains 149 selections across abstract animation, generative art, moving illustration, and stylized environments. Short source clips loop within their allotted slot; longer films play an excerpt. Program duration is not a claim that one hour of unique source footage is included.
 
-The first 122 selections retain their IDs, metadata, and order. The portrait expansion appends 45 works, keeping each artist capped at two. Source dimensions were used to shortlist candidates, then FFmpeg confirmed actual dimensions, changing frames, and codec. Spaced-frame filmstrips were visually reviewed for active motion; promotional cards, talking heads, zoomed stills, and incompatible formats were excluded. All 60 portrait selections use 8-bit H.264 4:2:0 (59 `yuv420p`; one full-range `yuvj420p`).
+The retained selections keep their IDs, metadata, and relative order, with each artist capped at two works in this base catalog. During the original verification, source dimensions were used to shortlist candidates, then FFmpeg confirmed actual dimensions, changing frames, and codec. Spaced-frame filmstrips were visually reviewed for active motion; promotional cards, talking heads, zoomed stills, and incompatible formats were excluded. All 42 remaining portrait videos use 8-bit H.264 4:2:0.
 
 ## Validation
 
@@ -46,7 +48,7 @@ The public catalog is a fixed selection. No API keys, wallets, market-price esti
 
 ## Maintenance
 
-Requires Node.js 20+ with built-in `fetch`. Run from the repository root:
+Requires Node.js 22+ with built-in `fetch`. Run from the repository root:
 
 ```sh
 node --test tests/catalog.test.mjs
@@ -62,9 +64,9 @@ FFMPEG_BIN=/absolute/path/to/ffmpeg node scripts/refresh-catalog.mjs --motion
 FFMPEG_BIN=/absolute/path/to/ffmpeg node scripts/refresh-catalog.mjs --write
 ```
 
-`--write` always includes motion validation. It updates timestamps only after the entire current selection passes, using an atomic file replacement. Any HTTP, decode, dimension, attribution, diversity, or catalog-size failure leaves the existing catalog untouched and exits nonzero. The script preserves the editorial selection and does not silently replace unavailable pieces with random new results. The validator requires 120–300 works, at least 60 artist identities, and at least 60 portrait-screen-qualified works. The catalog limit is independent of the application’s 150-work queue limit. Decoded motion checks also require 8-bit H.264 4:2:0 for works eligible for the portrait program. Update metadata/selections deliberately in `public/catalog.json`, then run both checks. URLs can change or become unavailable after validation.
+`--write` always includes motion validation. It updates timestamps only after the entire current selection passes, using an atomic file replacement. Any HTTP, decode, dimension, attribution, diversity, or catalog-size failure leaves the existing catalog untouched and exits nonzero. The script preserves the editorial selection and does not silently replace unavailable pieces with random new results. The validator requires 120–300 works, at least 60 artist identities, and at least 42 portrait-screen-qualified works. The catalog limit is independent of the application’s 150-work queue limit. Decoded motion checks also require 8-bit H.264 4:2:0 for works eligible for the portrait program. The exact 25 removed identities and media URLs are recorded in `src/curation.js`; validation rejects their return, and reference assembly filters them from historical candidate artifacts. Update metadata/selections deliberately in `public/catalog.json`, then run both checks. URLs can change or become unavailable after validation.
 
-## Checked selection
+## Current checked selection
 
 | Artwork | Artist | Decoded dimensions | Source |
 |---|---|---|---|
@@ -72,10 +74,8 @@ FFMPEG_BIN=/absolute/path/to/ffmpeg node scripts/refresh-catalog.mjs --write
 | 26281 | Bri4nH3nry | 1920 × 1080 | [objkt](https://objkt.com/tokens/KT1XaCf6gkjFnKg3QmPfn6gep53moMvjkj1E/48137) |
 | Lines of Force 11 · Scatter | Wozo | 1600 × 1600 | [objkt](https://objkt.com/tokens/KT1VFfnhCVjBkEZK7CYURJRFxtHBsxjvuRTC/12) |
 | Fractal Dream #30 | Driven by Dreams | 1920 × 1080 | [objkt](https://objkt.com/tokens/KT1FAu5MD3nKbzDwBmntLK7rQtApFFrkkKNr/30) |
-| Resonant Fluidity | Cromwell | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1XaCf6gkjFnKg3QmPfn6gep53moMvjkj1E/47389) |
 | Test Tile 02 (Line Blend) | Tom Lauerman | 3648 × 3648 | [objkt](https://objkt.com/tokens/KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton/885499) |
 | DoodleDeProgramming_20261014 | JunKiyoshi | 720 × 720 | [objkt](https://objkt.com/tokens/KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton/885716) |
-| Totem | KeyRun | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1RsmUhVphfQPAD7HoVqosskwCnYnqt6MHc/4) |
 | blue clouds | ake | 2560 × 1664 | [objkt](https://objkt.com/tokens/KT1E7WQFt861FRBvKPDQJBu9hSGHF4acaLBx/15) |
 | Untamed 19 | _arahad_ | 1904 × 1080 | [objkt](https://objkt.com/tokens/KT1D1qHkZtiZmyXvjS2UTYCj79NrWErFPp1x/21) |
 | Es zieht | ₸ommy | 3840 × 2160 | [objkt](https://objkt.com/tokens/KT1DBA4J1muAb8JSzU5tdAuKKNk2uSxCyV8n/32) |
@@ -143,7 +143,6 @@ FFMPEG_BIN=/absolute/path/to/ffmpeg node scripts/refresh-catalog.mjs --write
 | daemon | ana carolina | 1080 × 1080 | [objkt](https://objkt.com/tokens/KT19wRN6ozmy7nzC5drKi8RLyNvodsVqeS2T/12) |
 | The Mountain’s Breath | wow_studio | 1280 × 720 | [objkt](https://objkt.com/tokens/KT1XaCf6gkjFnKg3QmPfn6gep53moMvjkj1E/46420) |
 | Where the Rails Take You | 0xVac | 1920 × 1080 | [objkt](https://objkt.com/tokens/KT1V2yv5Edncq5GCKDpVD4p1E6A4QwoJR5Hp/0) |
-| Ink 🌳 3 : Chaos | rodicqart | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton/885011) |
 | The Room Beneath | Rozan | 736 × 544 | [objkt](https://objkt.com/tokens/KT1CxZRWNZU4agdBfmad16G5hxvCMg84gdCo/9) |
 | Flowers Bloom, Bugs Prosper | Riniifish | 1920 × 1920 | [objkt](https://objkt.com/tokens/KT1PZ1QBFFFZjXapbb7pnr9q8p86R5622C5t/18) |
 | Alive | Chroma Visions | 992 × 736 | [objkt](https://objkt.com/tokens/KT1PxkUVWqcyTHDC8god5pg4n1CaEkpjUwWh/31) |
@@ -190,21 +189,6 @@ FFMPEG_BIN=/absolute/path/to/ffmpeg node scripts/refresh-catalog.mjs --write
 | RGB Interference | LibroBlock | 2560 × 2560 | [objkt](https://objkt.com/tokens/KT1XaCf6gkjFnKg3QmPfn6gep53moMvjkj1E/43696) |
 | Perpetual Constraint | Leotorcello | 1080 × 1080 | [objkt](https://objkt.com/tokens/KT1Qg5T8RutAtH1N6yFqMXho2JECLjvgWf7G/18) |
 | Palace Empath | Somfay | 2160 × 2880 | [objkt](https://objkt.com/tokens/KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton/884100) |
-| Coded Tapestry: NY_241009 | seohyo | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT191impEgHHziwc4CUCh7KBmRESgUSbtGc3/5) |
-| Alpha Angel | rodicqart | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1SqyWbrnZsuASBo88amj8z35DdpkMgUgq8/10) |
-| PAC AN3Y  Shape Variant | MLOdotArt | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1UQEDEDq7Sa6J1vkW4pgTf9cReA7fzft6o/0) |
-| Wave 99 | joey zaza | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1UFZhdy4HFDByTU3J14Sb7xx2w2kMTwnnX/4) |
-| Synthesis #1 | neuralartistry.art | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1L27pj1vpxdq2SE3giJdFaQjb1Y5NLovT6/1) |
-| Collective Memories | Benjamin Bardou | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1EBYGCQSuNFm7qPR5b4u3BpWP3JZsFVXbk/1) |
-| The fifth wall (1) | A. L. Crego | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1Dz2pPnKBrkFr7R9FHCyQPmKoSDohpLCGR/18) |
-| Synthetic Field : Continuous [02] | ashuinyak | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1HhWkD2tLhumXsRdu6NsuKpzfXgWzV3WDk/2) |
-| Dance of Pixels III | Anonim | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton/882024) |
-| Flor 2 | Musty | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1BccZAYwCC8Myau5YpFVvP7e24zuDFS191/14) |
-| Outside | Musty | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1L2gk8LSfY6qDjKvPmoFqzXtsmYXpwNn7Q/2) |
-| U+1F635: Ulaw | Hero Granada | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1HWJEWN7SvxQtaA2bX77kjzmHb5J57bfYH/23) |
-| LN V.1 #003 | Viktor Bezic | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1SFHYBL4d5MbeJ21GV8nLuxgPWkHopjwkL/2) |
-| happy moment | ake | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1Q9vfGtrs9oud85GkSN7rt7ACAHGk2EA8M/5) |
-| Le Lecteur, Anatomie Artistique, Arnould Moreaux | Patrick Tresset | 2160 × 3840 | [objkt](https://objkt.com/tokens/KT1VQNS6cbJMCkVbUF6amzrxdxiaQtgSQ97b/26) |
 | grid_Signal 019 | DCD | 1440 × 2560 | [objkt](https://objkt.com/tokens/KT1XaCf6gkjFnKg3QmPfn6gep53moMvjkj1E/37482) |
 | O Pulso Ainda Pulsa | Luiz André Gama | 1080 × 1920 | [objkt](https://objkt.com/tokens/KT1MmrpCWtuMcmCxGqgxXkh8ZRxYcJBqwrHy/5) |
 | Rhythms of Silence: The Heaven In Red | Lena Ekert | 1080 × 1920 | [objkt](https://objkt.com/tokens/KT1DwqCpHuW6NETfHsMXWykz4wQGzkJrd1pC/16) |

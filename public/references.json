@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-19T05:34:36.469Z",
+  "updatedAt": "2026-10-31T05:00:01.856Z",
   "works": [
     {
       "id": "superrare-1-0x28599041bf82378b7b32f6b8acba348411254e7d-13",
@@ -6178,25 +6178,6 @@
       "verifiedAt": "2026-10-19T05:22:36.735Z"
     },
     {
-      "id": "superrare-1-0x47542736c9d1086dc87cc45138b2d57ec79eafa3-12",
-      "title": "Orchard of Absurd Epochs",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://storage.googleapis.com/sr_prod_artworks_bucket/asset%2Ff8b3292b58384ad64a7a15946f96aec755b17f077b18acaf626bdfb2d78a3c44.jpeg",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/f8b3292b58384ad64a7a15946f96aec755b17f077b18acaf626bdfb2d78a3c44.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=2481ad48d2708988e1a4e70efa4af7dc",
-      "width": 3072,
-      "height": 5376,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2023,
-      "description": "Artwork by botto. Public SuperRare token 1-0x47542736c9d1086dc87cc45138b2d57ec79eafa3-12.",
-      "verifiedAt": "2026-10-19T05:22:36.764Z"
-    },
-    {
       "id": "superrare-1-0x47542736c9d1086dc87cc45138b2d57ec79eafa3-3",
       "title": "Siamese Cycle in Absurdism",
       "artist": "botto",
@@ -6710,25 +6691,6 @@
       "verifiedAt": "2026-10-19T05:22:40.355Z"
     },
     {
-      "id": "superrare-1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-24",
-      "title": "Lunar Voyage Across Stratified Realms",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://arweave.net/ZMLXu_4-ePXzGWkOJjag99pcO7Tm-Z3qByJ5DDOZWdI",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/fc84b14c896672b98f00044e4d698eb3a4a551c98873050ee84ff5b380d10d3c.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=2022e4f9cff20610bb97bf0dca9ba6ae",
-      "width": 3072,
-      "height": 5120,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2025,
-      "description": "Artwork by botto. Public SuperRare token 1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-24.",
-      "verifiedAt": "2026-10-19T05:22:40.398Z"
-    },
-    {
       "id": "superrare-1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-26",
       "title": "Between Sight and Shadow",
       "artist": "botto",
@@ -6993,25 +6955,6 @@
       "year": 2025,
       "description": "Artwork by botto. Public SuperRare token 1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-41.",
       "verifiedAt": "2026-10-19T05:22:42.203Z"
-    },
-    {
-      "id": "superrare-1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-39",
-      "title": "Cartography Through Sedimentary Consciousness",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://arweave.net/p4kdwLsms7T1ebxNEwsfUD3lDi5hrVpMV0cDIuutKws",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/2cc46cafc30df7678a8a43e5aca7516ebcfc062fe0bdd162595652828e69e479.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=a1629fff22f9acf9ba5d545bfc982cca",
-      "width": 3200,
-      "height": 5120,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2025,
-      "description": "Artwork by botto. Public SuperRare token 1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-39.",
-      "verifiedAt": "2026-10-19T05:22:42.243Z"
     },
     {
       "id": "superrare-1-0x66cd3ede22a25eef3cc8799381b99b1d4f0983f8-42",
@@ -9009,25 +8952,6 @@
       "verifiedAt": "2026-10-19T05:22:54.447Z"
     },
     {
-      "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-21",
-      "title": "Mirages of Architectural Captivity",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://storage.googleapis.com/sr_prod_artworks_bucket/asset%2Fe5cde5388e458d09963a5ab454c25c01b7cecf2aaa19c2872e830948d0e8fc78.jpeg",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/e5cde5388e458d09963a5ab454c25c01b7cecf2aaa19c2872e830948d0e8fc78.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=98fbc45476ef1dc1f140df4ebc9105af",
-      "width": 3072,
-      "height": 5376,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2024,
-      "description": "Artwork by botto. Public SuperRare token 1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-21.",
-      "verifiedAt": "2026-10-19T05:22:54.492Z"
-    },
-    {
       "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-22",
       "title": "Shadowed Moments in Daylight",
       "artist": "botto",
@@ -9446,25 +9370,6 @@
       "verifiedAt": "2026-10-19T05:22:56.654Z"
     },
     {
-      "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-41",
-      "title": "April's Junction to Tomorrow",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://storage.googleapis.com/sr_prod_artworks_bucket/asset%2F97e6880c1cebf0009a076e99ae66b036d427eb1113b4298ec72f1d7274de682e.jpeg",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/97e6880c1cebf0009a076e99ae66b036d427eb1113b4298ec72f1d7274de682e.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=1ba4c6a870be4db08f47289963e5fb99",
-      "width": 3072,
-      "height": 5376,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2024,
-      "description": "Artwork by botto. Public SuperRare token 1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-41.",
-      "verifiedAt": "2026-10-19T05:22:56.677Z"
-    },
-    {
       "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-42",
       "title": "Encased Histories Spilled Secrets",
       "artist": "botto",
@@ -9691,25 +9596,6 @@
       "year": 2024,
       "description": "Artwork by botto. Public SuperRare token 1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-52.",
       "verifiedAt": "2026-10-19T05:22:57.909Z"
-    },
-    {
-      "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-6",
-      "title": "Inverted Realms of Perception",
-      "artist": "botto",
-      "artistKey": "0x000a837ddd815bcba0fa91a98a50aa7a3fa62c9c",
-      "source": "SuperRare",
-      "collection": "Botto",
-      "sourceUrl": "https://superrare.com/botto",
-      "mediaUrl": "https://storage.googleapis.com/sr_prod_artworks_bucket/asset%2F93e11eeb69c886aa1ac3370d63859e6b3e3e8773f787b4524768401010b2af32.jpeg",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/93e11eeb69c886aa1ac3370d63859e6b3e3e8773f787b4524768401010b2af32.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=b498ef10ad668803bc21fcddd47b28f4",
-      "width": 3072,
-      "height": 5376,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2024,
-      "description": "Artwork by botto. Public SuperRare token 1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-6.",
-      "verifiedAt": "2026-10-19T05:22:58.025Z"
     },
     {
       "id": "superrare-1-0xca53bb6cdfcd5bf437bf4ac6d17c3b0e67d8a83e-7",
@@ -11002,25 +10888,6 @@
       "year": 2023,
       "description": "Artwork by intrepid. Public SuperRare token 1-0xa8cdbd77143d4c252ef41b1fc45902595c9b7786-8.",
       "verifiedAt": "2026-10-19T05:26:26.977Z"
-    },
-    {
-      "id": "superrare-1-0xa8cdbd77143d4c252ef41b1fc45902595c9b7786-7",
-      "title": "Ghost Ship",
-      "artist": "intrepid",
-      "artistKey": "0x19e7a132bd4b42f580f546197f42e19c42cdfe6c",
-      "source": "SuperRare",
-      "collection": "Intrepid",
-      "sourceUrl": "https://superrare.com/intrepid",
-      "mediaUrl": "https://storage.googleapis.com/sr_prod_artworks_bucket/asset%2F014111635e7af6e75d92070580d0cc2bf5cd4bf7fbad89a2dc323e9fd3b52362.jpeg",
-      "posterUrl": "https://superrare-artworks.imgix.net/asset/014111635e7af6e75d92070580d0cc2bf5cd4bf7fbad89a2dc323e9fd3b52362.jpeg?ixlib=js-3.8.0&width=550&height=550&fm=avif&fit=crop&video=false&name=ImageMedium&auto=compress&s=713a6a3b1cf591c0efad0ee16ca92c8a",
-      "width": 3995,
-      "height": 7103,
-      "orientation": "portrait",
-      "kind": "image",
-      "animated": false,
-      "year": 2023,
-      "description": "Artwork by intrepid. Public SuperRare token 1-0xa8cdbd77143d4c252ef41b1fc45902595c9b7786-7.",
-      "verifiedAt": "2026-10-19T05:26:27.055Z"
     },
     {
       "id": "superrare-1-0xc0a68e7ab4a6eeadc189ef2ebb0444ec890e4e2f-2",
@@ -31921,7 +31788,7 @@
       "collections": [
         "Botto"
       ],
-      "available": 251,
+      "available": 245,
       "note": "Verified file links; source totals may differ."
     },
     {
@@ -31930,7 +31797,7 @@
       "collections": [
         "Intrepid"
       ],
-      "available": 98,
+      "available": 97,
       "note": "Verified file links; source totals may differ."
     },
     {

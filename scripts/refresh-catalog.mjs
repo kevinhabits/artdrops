@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { isPortraitScreenWork } from '../src/core.js';
+import { isExcludedWork } from '../src/curation.js';
 
 const catalogPath = fileURLToPath(new URL('../public/catalog.json', import.meta.url));
 
@@ -16,6 +17,7 @@ export function validateCatalog(catalog) {
   const media = new Set();
   const artists = new Map();
   for (const work of catalog.works) {
+    if (isExcludedWork(work)) throw new Error(`${work.id}: excluded by curation`);
     for (const key of ['id', 'title', 'artist', 'artistKey', 'description', 'verifiedAt']) {
       if (typeof work[key] !== 'string' || !work[key].trim()) throw new Error(`${work.id}: missing ${key}`);
     }
@@ -38,7 +40,7 @@ export function validateCatalog(catalog) {
   }
   if (artists.size < 60) throw new Error('The selection must represent at least 60 distinct artists.');
   const portraitWorks = catalog.works.filter(isPortraitScreenWork).length;
-  if (portraitWorks < 60) throw new Error('The selection must contain at least 60 works suitable for the portrait screen.');
+  if (portraitWorks < 42) throw new Error('The selection must contain at least 42 works suitable for the portrait screen.');
   return { works: ids.size, artists: artists.size, portraitWorks };
 }
 

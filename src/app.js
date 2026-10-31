@@ -1,6 +1,7 @@
 import { ExhibitionPlayer } from './player.js';
 import { DEFAULT_SETTINGS, MAX_WORKS, MAX_CATALOG_WORKS, MAX_EXHIBITION_BYTES, cleanWork, cleanSettings, uniqueWorks, rememberCustomWork, filterWorks, moveItem, makeExhibition, makeHourMix, makePortraitMix, portraitScreenWorks, isPortraitScreenWork, displayDimensions, readExhibition, parseExhibition, serializeExhibition, exhibitionFilename, durationLabel, safeUrl } from './core.js';
 import { PLAYLISTS_KEY, normalizePlaylistName, listPlaylists, savePlaylist, deletePlaylist, restorePlaylist, withPlaylistLock } from './playlists.js';
+import { isExcludedWork, excludeWorks } from './curation.js';
 
 const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = 'artdrops:exhibition:v1';
@@ -9,6 +10,7 @@ let catalog = [], custom = [], queue = [], settings = { ...DEFAULT_SETTINGS };
 let loaded = false, saved = false, visibleCount = PAGE_SIZE, toastTimer, undoAction, importController;
 let previewObserver, lastFocus, activeShow = false;
 let playlistName = '', pendingReplace = null, importRevision = 0, workingRevision = 0;
+let removedOnRestore = 0, prunedCustom = false;
 const observed = new Set();
 const inView = new Set();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -35,10 +37,13 @@ try {
   if (raw) {
     const stored = JSON.parse(raw);
     const restored = readExhibition(stored);
-    queue = restored.works;
+    queue = excludeWorks(restored.works);
+    removedOnRestore = restored.works.length - queue.length;
     settings = restored.settings;
     playlistName = restored.name || '';
-    custom = uniqueWorks(Array.isArray(stored.custom) ? stored.custom : []);
+    const restoredCustom = uniqueWorks(Array.isArray(stored.custom) ? stored.custom : []);
+    custom = excludeWorks(restoredCustom);
+    prunedCustom = custom.length !== restoredCustom.length;
     saved = true;
   }
 } catch { notify('Saved data couldn’t be read. The starter exhibition will be available when the collection loads.'); }
@@ -164,6 +169,7 @@ const player = new ExhibitionPlayer({
   onStatus: message => { /* Player shows failures inside its modal. */ },
 });
 function play(works) {
+  works = excludeWorks(works);
   if (!works.length) { notify('Add an artwork to your exhibition first.'); return; }
   lastFocus = document.activeElement;
   activeShow = true; stopPreviews(true);
@@ -382,6 +388,7 @@ $('#add-form').addEventListener('submit', async event => {
   const url = safeUrl(data.get('url')); const error = $('#add-error'); error.hidden = true;
   const candidate = cleanWork({ id: `custom:${crypto.randomUUID()}`, kind: data.get('kind'), rotation: Number(data.get('rotation')), title: data.get('title'), artist: data.get('artist'), mediaUrl: url, source: 'Your links', posterUrl: data.get('kind') === 'image' ? url : null, animated: data.get('kind') === 'image' && /\.gif(?:$|[?#])/i.test(url || '') });
   if (!candidate) { error.textContent = 'Use an HTTPS artwork file URL, select its media type, and include a title and artist.'; error.hidden = false; return; }
+  if (isExcludedWork(candidate)) { error.textContent = 'This 4K portrait was removed because it loads too slowly. Choose another artwork.'; error.hidden = false; return; }
   if (queue.length >= MAX_WORKS) { error.textContent = `An exhibition can hold up to ${MAX_WORKS} works. Remove a work before adding another.`; error.hidden = false; return; }
   const existing = allWorks().find(work => work.mediaUrl === url && work.kind === candidate.kind && work.rotation === candidate.rotation);
   if (existing) {
@@ -404,21 +411,28 @@ $('#add-form').addEventListener('submit', async event => {
 
 function exportJson(works, displaySettings, name) {
   try {
-    const blob = new Blob([serializeExhibition(works, displaySettings, name)], { type: 'application/json' });
+    const available = excludeWorks(works), removed = works.length - available.length;
+    if (removed && !available.length) throw new Error('This playlist only contains removed 4K portraits. Add other artwork before exporting.');
+    const blob = new Blob([serializeExhibition(available, displaySettings, name)], { type: 'application/json' });
     const url = URL.createObjectURL(blob), link = element('a');
     link.href = url; link.download = exhibitionFilename(name); document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 15000);
-    notify('JSON download requested. Keep the file as a backup or import it on another computer.');
+    notify(`JSON download requested.${removalNote(removed)} Keep the file as a backup or import it on another computer.`);
   } catch (error) { notify(error.message); }
 }
+function removalNote(count) {
+  return count ? ` Skipped ${count} removed 4K portrait${count === 1 ? '' : 's'}.` : '';
+}
 function applyExhibition(imported, message) {
+  const available = excludeWorks(imported.works), removed = imported.works.length - available.length;
+  if (removed && !available.length) throw new Error('This playlist only contains removed 4K portraits. Your exhibition was not changed.');
   const previous = { queue, settings, custom, playlistName };
-  queue = imported.works; settings = imported.settings; playlistName = imported.name || '';
+  queue = available; settings = imported.settings; playlistName = imported.name || '';
   const known = new Set(catalog.map(work => work.id));
   custom = uniqueWorks([...queue.filter(work => !known.has(work.id)), ...custom]);
   syncSettings(); syncSources(); renderLibrary(); updateQueue();
   const stored = persist();
-  notify(`${message}${stored ? '' : ' Browser storage is unavailable; export a backup.'}`, () => {
+  notify(`${message}${removalNote(removed)}${stored ? '' : ' Browser storage is unavailable; export a backup.'}`, () => {
     ({ queue, settings, custom, playlistName } = previous);
     syncSettings(); syncSources(); renderLibrary(); updateQueue(); persist();
   });
@@ -434,7 +448,7 @@ $('#import-file').addEventListener('change', async event => {
     if (request !== importRevision) return;
     if (revision !== workingRevision) { notify('Import cancelled because your exhibition changed. Choose the file again to import it.'); return; }
     const imported = parseExhibition(text);
-    applyExhibition(imported, `Imported ${imported.works.length} works${imported.name ? ` from “${imported.name}”` : ''}.`);
+    applyExhibition(imported, `Imported ${excludeWorks(imported.works).length} works${imported.name ? ` from “${imported.name}”` : ''}.`);
   } catch (error) {
     if (request === importRevision && revision === workingRevision) notify(error instanceof SyntaxError ? 'This isn’t a valid exhibition JSON file. Your exhibition is unchanged.' : error.message);
   }
@@ -456,8 +470,9 @@ function renderPlaylists() {
     const entries = listPlaylists(localStorage);
     $('#playlist-empty').hidden = entries.length > 0;
     for (const entry of entries) {
+      const available = excludeWorks(entry.exhibition.works), removed = entry.exhibition.works.length - available.length;
       const row = element('li', 'playlist-row'), details = element('div', 'playlist-details');
-      details.append(element('strong', '', entry.name), element('span', '', `${entry.exhibition.works.length} works · ${durationLabel(entry.exhibition.works.length, entry.exhibition.settings.duration)}`));
+      details.append(element('strong', '', entry.name), element('span', '', `${available.length} works · ${durationLabel(available.length, entry.exhibition.settings.duration)}${removed ? ` · ${removed} removed` : ''}`));
       const actions = element('div', 'playlist-actions');
       for (const [label, accessible, action] of [
         ['Load', `Load ${entry.name}`, () => {
@@ -539,7 +554,7 @@ async function loadCatalog() {
       references = await extra.json();
       if (references.version !== 1 || !Array.isArray(references.works)) throw new Error('Invalid references');
     } catch { references = null; notify('The requested collections could not load. The original library is still available; reload to try again.'); }
-    const works = uniqueWorks([...result.works, ...(references?.works || [])], MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
+    const works = uniqueWorks(excludeWorks([...result.works, ...(references?.works || [])]), MAX_CATALOG_WORKS); if (!works.length) throw new Error('Empty catalog');
     catalog = works; loaded = true;
     syncMix();
     // Saved exhibitions are snapshots: a catalog refresh must not reset their rotation or links.
@@ -573,4 +588,9 @@ async function loadCatalog() {
 $('#retry-catalog').addEventListener('click', loadCatalog);
 document.addEventListener('visibilitychange', syncPreviews);
 reducedMotion.addEventListener('change', syncPreviews);
-syncSettings(); updateQueue(); loadCatalog();
+syncSettings(); updateQueue();
+if (removedOnRestore || prunedCustom) {
+  const stored = persist();
+  if (stored) notify(`Removed slow-loading 4K portraits from your saved exhibition and links.${removedOnRestore ? ` ${removedOnRestore} removed from this exhibition.` : ''}`);
+}
+loadCatalog();

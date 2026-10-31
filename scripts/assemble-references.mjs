@@ -1,6 +1,7 @@
 // Merge verified review artifacts into the static library, never unverified metadata.
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { validateReferences } from './validate-references.mjs';
+import { excludeWorks } from '../src/curation.js';
 
 const targets = [
   ['Still MS Painting', 'https://superrare.com/collection/1-0x4573cfc6cd3bf62000c1b0b55ce1beeee0b8cbd8'],
@@ -15,7 +16,8 @@ for (const name of ['superrare', 'orkhan', 'drive']) {
   try {
     const candidate = JSON.parse(await readFile(new URL(`../artifacts/${name}-candidates.json`, import.meta.url), 'utf8'));
     if (candidate.version !== 1 || !Array.isArray(candidate.works)) throw new Error(`Invalid ${name} candidates`);
-    works.push(...candidate.works);
+    // Historical verification artifacts remain intact; curation controls publication.
+    works.push(...excludeWorks(candidate.works));
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
 if (!works.length) throw new Error('No verified new artworks. The public reference catalog was not changed.');

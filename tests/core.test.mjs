@@ -101,14 +101,28 @@ test('a larger catalog preserves portrait works past the exhibition queue limit'
   assert.equal(catalog.length, 210);
   assert.throws(() => readExhibition({ ...makeExhibition([], {}), works: catalog }), /up to 150/);
 });
-test('portrait mix keeps a full hour with a smaller selection and never fills with landscape works', () => {
-  const works = Array.from({ length: 40 }, (_, i) => ({ ...work, id: String(i), width: 1080, height: 1920 }));
-  const mix = makePortraitMix(works, {});
-  assert.equal(mix.works.length, 30);
-  assert.equal(mix.settings.duration, 120);
-  assert.equal(mix.works.length * mix.settings.duration, 3600);
-  assert.equal(makePortraitMix([...works.slice(0, 29), work], {}), null);
-});
+for (const [available, expectedCount, expectedDuration] of [
+  [60, 60, 60], [59, 40, 90], [50, 40, 90], [40, 40, 90],
+  [39, 30, 120], [30, 30, 120], [29, null, null],
+]) {
+  test(`portrait mix with ${available} eligible works ${expectedCount ? `uses ${expectedCount} × ${expectedDuration} seconds` : 'remains unavailable'}`, () => {
+    const portraits = Array.from({ length: available }, (_, i) => ({ ...work, id: `portrait-${i}`, width: 1080, height: 1920 }));
+    const works = [...portraits, portraits[0], { ...work, id: 'landscape' }, { ...work, id: 'too-tall', width: 1080, height: 2400 }];
+    const before = structuredClone(works);
+    const settings = { duration: 20, fit: 'cover', transition: 'none', captions: false, shuffle: false };
+    const mix = makePortraitMix(works, settings);
+    if (expectedCount === null) assert.equal(mix, null);
+    else {
+      assert.equal(mix.works.length, expectedCount);
+      assert.deepEqual(mix.works.map(item => item.id), portraits.slice(0, expectedCount).map(item => item.id));
+      assert.equal(mix.works.length * mix.settings.duration, 3600);
+      assert.deepEqual(mix.settings, { duration: expectedDuration, fit: 'contain', transition: 'none', captions: false, shuffle: true });
+      assert.deepEqual(readExhibition(makeExhibition(mix.works, mix.settings)), mix);
+    }
+    assert.deepEqual(works, before);
+    assert.deepEqual(settings, { duration: 20, fit: 'cover', transition: 'none', captions: false, shuffle: false });
+  });
+}
 
 test('older exhibitions gain a soft fade while explicit transition choices survive backups', () => {
   const legacy = { format: 'artdrops-exhibition', version: 1, works: [work], settings: { duration: 60, captions: false } };

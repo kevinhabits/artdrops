@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validateReferences } from '../scripts/validate-references.mjs';
 import { cleanWork, displayDimensions, filterWorks, isPortraitScreenWork, uniqueWorks, MAX_CATALOG_WORKS } from '../src/core.js';
+import { EXCLUDED_WORKS, isExcludedWork } from '../src/curation.js';
 
 function fixture() {
   return { version: 1, works: [{ id: 'sample', title: 'Sample', artist: 'Artist', source: 'SuperRare', collection: 'Sample collection', kind: 'image', mediaUrl: 'https://media.example/image.webp', sourceUrl: 'https://superrare.com/artist', width: 1000, height: 1000, verifiedAt: '2026-10-19T00:00:00Z' }], references: [{ name: 'Sample', url: 'https://superrare.com/artist', collections: ['Sample collection'], available: 1 }] };
@@ -26,6 +27,15 @@ test('reference data requires dimensions, dates, source attribution, and support
   }
 });
 
+test('reference validation prevents excluded works from being published again', () => {
+  const excluded = EXCLUDED_WORKS.find(work => work.id.startsWith('superrare-'));
+  for (const field of ['id', 'mediaUrl', 'alternateMediaUrl']) {
+    const candidate = fixture();
+    candidate.works[0][field] = field === 'id' ? excluded.id : excluded.mediaUrl;
+    assert.throws(() => validateReferences(candidate), /excluded by curation/);
+  }
+});
+
 const [shipped, original] = await Promise.all(['references.json', 'catalog.json'].map(async name =>
   JSON.parse(await readFile(new URL(`../public/${name}`, import.meta.url), 'utf8'))));
 
@@ -38,6 +48,7 @@ test('the shipped reference library validates and preserves every original work 
   assert.deepEqual(merged.slice(0, original.works.length), original.works.map(cleanWork));
   const ids = new Set(merged.map(work => work.id));
   assert.ok(shipped.works.every(work => ids.has(work.id)));
+  assert.equal(shipped.works.some(isExcludedWork), false);
 });
 
 test('shipped Untitled contains all 414 standard and 414 mask episodes at their verified square resolution', () => {

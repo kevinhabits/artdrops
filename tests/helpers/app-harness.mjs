@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import * as core from '../../src/core.js';
 import * as playlists from '../../src/playlists.js';
+import * as curation from '../../src/curation.js';
 
 const source = await readFile(new URL('../../src/app.js', import.meta.url), 'utf8');
 const html = await readFile(new URL('../../public/index.html', import.meta.url), 'utf8');
@@ -101,7 +102,7 @@ export async function appHarness({ stored, storage = new Map(), catalog = [], ca
     static revokeObjectURL(url) { blobs.delete(url); }
   }
   const context = vm.createContext({
-    ...core, ...playlists, document, Blob, URL: MemoryURL, TextEncoder, AbortController, AbortSignal, DOMException, console,
+    ...core, ...playlists, ...curation, document, Blob, URL: MemoryURL, TextEncoder, AbortController, AbortSignal, DOMException, console,
     crypto: { randomUUID: () => `fixture-${++sequence}` },
     localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     setTimeout: callback => { const id = ++sequence; timers.set(id, callback); return id; }, clearTimeout: id => timers.delete(id),

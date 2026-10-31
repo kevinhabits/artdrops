@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appHarness, deferred, STORAGE_KEY } from './helpers/app-harness.mjs';
-import { PLAYLISTS_KEY } from '../src/playlists.js';
+import { PLAYLISTS_KEY, savePlaylist } from '../src/playlists.js';
+import { EXCLUDED_WORKS } from '../src/curation.js';
 
 const work = (id, extra = {}) => ({
   id, title: `Artwork ${id}`, artist: 'Example artist', kind: 'image', source: 'Orkhan',
@@ -34,6 +35,83 @@ async function saveCurrent(app, name) {
   await app.node('playlist-form').dispatch('submit');
   assert.equal(app.node('playlist-error').hidden, true);
 }
+
+const removedPortrait = work(EXCLUDED_WORKS[0].id, { ...EXCLUDED_WORKS[0], width: 2160, height: 3840 });
+function storeLegacyPlaylist(storage, works, name = 'Legacy show') {
+  return savePlaylist({ getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }, { name, works, settings });
+}
+
+test('removed portraits are pruned from the restored queue, custom links and stale catalog without rejecting unrelated 4K art', async () => {
+  const customCopy = { ...removedPortrait, id: 'custom:old-copy' };
+  const other4k = work('other-4k', { width: 2160, height: 3840 });
+  const app = await boot({ stored: { ...exhibition([removedPortrait, other4k]), custom: [customCopy, other4k] }, catalog: [removedPortrait, ...catalog] });
+  const stored = JSON.parse(app.storage.get(STORAGE_KEY));
+  assert.deepEqual(stored.works.map(item => item.id), ['other-4k']);
+  assert.deepEqual(stored.custom.map(item => item.id), ['other-4k']);
+  assert.match(app.node('toast-message').textContent, /1 removed/);
+  assert.equal(app.node('collection-stats').textContent, '1 works · 1 artists · 1 source');
+  assert.deepEqual(app.node('art-grid').children.map(item => item.dataset.workId), ['catalog', 'other-4k']);
+  const reloaded = await appHarness({ storage: app.storage, catalog });
+  assert.deepEqual((await snapshot(reloaded)).works.map(item => item.id), ['other-4k']);
+});
+
+test('an all-removed saved exhibition stays empty instead of silently receiving starter artwork', async () => {
+  const app = await boot({ stored: exhibition([removedPortrait]) });
+  assert.equal(app.node('queue-list').children.length, 0);
+  assert.equal(app.node('start-show').disabled, true);
+  assert.deepEqual(JSON.parse(app.storage.get(STORAGE_KEY)).works, []);
+});
+
+test('old JSON skips removed portraits, reports the actual imported count and preserves strict validation and Undo', async () => {
+  const app = await boot();
+  const before = await snapshot(app);
+  await app.importText(JSON.stringify(exhibition([removedPortrait, work('keep')])));
+  assert.match(app.node('toast-message').textContent, /Imported 1 works.*Skipped 1 removed 4K portrait/);
+  assert.deepEqual(JSON.parse(app.storage.get(STORAGE_KEY)).works.map(item => item.id), ['keep']);
+  await app.click('toast-undo');
+  assert.deepEqual(await snapshot(app), before);
+  await app.importText(JSON.stringify(exhibition([removedPortrait, removedPortrait, work('bad-duplicate')])));
+  assert.match(app.node('toast-message').textContent, /invalid or duplicate/);
+  assert.deepEqual(await snapshot(app), before);
+});
+
+test('legacy named playlists show and export available works while the original saved snapshot stays intact', async () => {
+  const storage = new Map();
+  storeLegacyPlaylist(storage, [removedPortrait, work('keep')]);
+  const raw = storage.get(PLAYLISTS_KEY);
+  const app = await boot({ storage });
+  await app.click('playlists');
+  const details = app.node('playlist-list').querySelector('.playlist-details');
+  assert.match(details.children[1].textContent, /^1 works .*1 removed/);
+  await playlistButton(app, 'Export Legacy show as JSON').click();
+  const backup = JSON.parse(await app.downloads.at(-1).blob.text());
+  assert.deepEqual(backup.works.map(item => item.id), ['keep']);
+  assert.match(app.node('toast-message').textContent, /Skipped 1 removed/);
+  await app.click('playlists');
+  await playlistButton(app, 'Load Legacy show').click();
+  assert.match(app.node('toast-message').textContent, /Skipped 1 removed/);
+  assert.deepEqual((await snapshot(app)).works.map(item => item.id), ['keep']);
+  assert.equal(storage.get(PLAYLISTS_KEY), raw, 'do not rewrite or delete the user’s named snapshots');
+});
+
+test('all-removed imports and saved playlists leave the current exhibition intact and cannot export removed works', async () => {
+  const storage = new Map();
+  storeLegacyPlaylist(storage, [removedPortrait]);
+  const app = await boot({ storage });
+  const before = await snapshot(app);
+  await app.importText(JSON.stringify(exhibition([removedPortrait])));
+  assert.match(app.node('toast-message').textContent, /only contains removed.*not changed/);
+  assert.deepEqual(await snapshot(app), before);
+  await app.click('playlists');
+  await playlistButton(app, 'Load Legacy show').click();
+  assert.match(app.node('toast-message').textContent, /only contains removed.*not changed/);
+  assert.deepEqual(await snapshot(app), before);
+  await app.click('playlists');
+  const downloads = app.downloads.length;
+  await playlistButton(app, 'Export Legacy show as JSON').click();
+  assert.equal(app.downloads.length, downloads);
+  assert.match(app.node('toast-message').textContent, /only contains removed/);
+});
 
 test('the actual export handler creates an attached download anchor with a mixed-media JSON Blob', async () => {
   const app = await boot();

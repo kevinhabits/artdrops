@@ -1,6 +1,15 @@
 # Release verification
 
-Latest loop and navigation reliability checks were completed on 2026-10-31. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+Latest curation and playlist checks were completed on 2026-10-31. Earlier release evidence is retained separately below. Collection counts and import status are maintained in [reference-import.md](reference-import.md).
+
+## 2026-10-31 — remove slow-loading 4K portraits
+
+- Removed the exact 25 catalog works carrying the **4K PORTRAIT** badge: 18 objkt videos and seven SuperRare still images. The remaining catalog contains **1,732 works by 122 artist identities across five sources**, including 50 portrait-screen-qualified works. Remaining entries retain their metadata, verification dates, and order; this curation update does not claim a new network/media verification pass.
+- The shared curation list prevents the removed identities and known media URLs from returning through catalog assembly, stale catalog responses, restored custom links, current exhibitions, JSON imports, named-playlist loads, direct links, or JSON exports. Strict JSON validation still precedes filtering. Named playlist snapshots remain stored, with available counts and skipped-work notices in the UI; an all-removed import/load preserves the current exhibition. An all-removed restored working queue stays empty rather than receiving a new starter mix.
+- The portrait preset now supports **40 works × 90 seconds = one hour** between the existing 60 × 60 and 30 × 120 tiers. The current 50 qualifying works use the 40-work tier. Shuffle and full-artwork fitting remain enabled.
+- The user chose to retain the **three-slot media pool** after discussing the additional memory and download bandwidth of five slots. No player implementation changes were made. The existing offline ZIP is unchanged.
+- All **164 Node tests** and the static build pass, including new curation, old-playlist migration, JSON filtering/Undo, empty-list protection, and portrait-mix threshold coverage. Catalog validators confirm zero remaining works meeting the 4K portrait badge predicate.
+- An isolated headless Chromium check used the actual catalogs with local stand-in media. It confirmed 1,732 library works, all 50 portrait cards without a 4K badge, the 40 × 90-second mix, removal of all 25 old entries from restored queues, named-playlist load/export, JSON import/Undo, all-removed-list protection, and rejection of a renamed removed media URL before requesting it. No excluded media requests or page errors occurred; all videos were muted and fullscreen/wake lock were disabled. Export checks inspect the real application Blob without opening a download dialog. This does not measure remote-host latency or physical Samsung playback.
 
 ## 2026-10-31 — 90-second slots and loop/navigation reliability
 

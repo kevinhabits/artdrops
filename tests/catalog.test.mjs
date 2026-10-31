@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validateCatalog } from '../scripts/refresh-catalog.mjs';
 import { isPortraitScreenWork } from '../src/core.js';
+import { EXCLUDED_WORKS, isExcludedWork } from '../src/curation.js';
 
 const catalog = JSON.parse(await readFile(new URL('../public/catalog.json', import.meta.url), 'utf8'));
 
@@ -20,14 +21,24 @@ test('curated catalog has real source links, motion media, dimensions, and artis
   }
 });
 
-test('portrait program fills one hour with sixty distinct screen-qualified works', () => {
+test('the curated catalog retains 42 screen-qualified portraits after removing the 4K group', () => {
   const portrait = catalog.works.filter(isPortraitScreenWork);
-  assert.ok(portrait.length >= 60);
+  assert.equal(portrait.length, 42);
   assert.ok(new Set(portrait.map(work => work.artistKey)).size >= 30);
-  assert.ok(portrait.filter(work => work.width >= 2160 && work.height >= 3840).length >= 18);
+  assert.equal(portrait.filter(work => work.width >= 2160 && work.height >= 3840).length, 0);
   const reduced = structuredClone(catalog);
-  for (const work of reduced.works.filter(isPortraitScreenWork).slice(59)) work.width = 1000;
+  for (const work of reduced.works.filter(isPortraitScreenWork).slice(41)) work.width = 1000;
   assert.throws(() => validateCatalog(reduced), /portrait screen/);
+});
+
+test('refresh validation prevents excluded artworks from returning by ID or media URL', () => {
+  assert.equal(catalog.works.some(isExcludedWork), false);
+  const excluded = EXCLUDED_WORKS.find(work => work.id.startsWith('objkt-'));
+  for (const field of ['id', 'mediaUrl']) {
+    const restored = structuredClone(catalog);
+    restored.works[0][field] = excluded[field];
+    assert.throws(() => validateCatalog(restored), /excluded by curation/);
+  }
 });
 
 test('failed or empty refresh cannot pass catalog validation', () => {

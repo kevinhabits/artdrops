@@ -23,12 +23,12 @@ npm start     # Serves the production build locally
 ## Put on a show
 
 1. Connect the laptop to the display. For the Samsung Follow Me Pro 43″ in portrait, rotate the computer's output 90° or 270° and select **2160 × 3840 at 60 Hz** when supported. Move this browser window to that display. See the [portrait display guide](docs/samsung-portrait.md).
-2. Keep **Mix for → Portrait screen · 9:16** and choose **Build a 1-hour mix** for upright works with shuffle enabled. The mix note shows the number of works and time per work. **All artwork** retains the original 120-work / 30-second mix. Or make your own selection and choose 10, 20, 30, 60, **90**, or 120 seconds per work. Short videos repeat within that time; the default remains 30 seconds. A new browser starts with six portrait works from different artists; existing saved queues stay intact until you replace them. The mix button offers Undo.
+2. Keep **Mix for → Portrait screen · 9:16** and choose **Build a 1-hour mix** for upright works with shuffle enabled. The mix note shows the number of works and time per work. **All artwork** retains the original 120-work / 30-second mix. Or make your own selection and choose 10, 20, 30, 60, **90**, or 120 seconds per work. Short videos repeat within that time; the default remains 30 seconds. A new browser starts with six portrait works from different artists; existing saved queues retain their order and settings, with curator-removed works skipped. The mix button offers Undo.
 3. Choose **Show full artwork** to preserve the composition, or **Fill screen** to crop to the display. **Between artworks → Soft fade · 1.5 seconds** gently blends each work into the next; **No transition** switches instantly. Soft fade is the default, including for older saved exhibitions. Artist captions and shuffle are optional.
 4. Start the exhibition. Arrow keys navigate, Space pauses both rotation and video, and F toggles fullscreen. Fullscreen changes keep the current artwork playing. Escape leaves fullscreen first; Close leaves the exhibition directly. If fullscreen is unavailable, the show fills the browser window. If the browser blocks playback, select **Resume** to start the same artwork.
 5. Keep the laptop powered and disable system sleep for a long show. A browser screen wake lock is requested when supported, but system settings still matter.
 
-Art plays silently and loops. Artist captions show the artwork title, then **Artist · Source** (for example, **Cromwell · objkt**). **9:16 screen** filters for artwork at least 1080 × 1920 that covers at least 90% of the portrait display without cropping, accounting for any rotation. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show verified dimensions; **4K PORTRAIT** identifies sources at least 2160 × 3840. A 4K display does not make a lower-resolution original 4K.
+Art plays silently and loops. Artist captions show the artwork title, then **Artist · Source** (for example, **Cromwell · objkt**). **9:16 screen** filters for artwork at least 1080 × 1920 that covers at least 90% of the portrait display without cropping, accounting for any rotation. The portrait mix selects the closest aspect ratios and then the highest resolutions, and sets **Show full artwork**. Artwork cards show verified dimensions. The 25 catalog works previously labeled **4K PORTRAIT** were removed on October 31 because of slow loading; 50 screen-qualified portraits remain. The current one-hour portrait mix uses 40 works at 90 seconds each. A 4K display does not make a lower-resolution original 4K.
 
 For a four-hour event, start the one-hour mix and leave it running. Every work appears once per pass, then the next pass uses a fresh shuffle with no immediate repeat at the boundary. The exhibition continues until you stop it; there is no four-hour cutoff. Loading delays, pauses, and unavailable works can change the wall-clock length of a pass.
 
@@ -36,7 +36,7 @@ For a four-hour event, start the one-hour mix and leave it running. Every work a
 
 The current queue and settings autosave locally in this browser. Open **Playlists**, give the current exhibition a name, and choose **Save playlist** to keep a separate copy. You can save up to 20 named playlists (subject to browser storage space), each with up to 150 works. **Load** restores its order and settings and offers Undo. Editing the current exhibition does not change a saved playlist; saving the same name asks you to explicitly replace it. Deleting a saved playlist also offers Undo.
 
-**Export JSON** backs up the current exhibition; each saved playlist has its own export button. **Import JSON** loads a backup into the current exhibition with Undo, then **Playlists → Save playlist** keeps it as a named copy. Backups preserve the name, artwork order, source credits, media links, rotation, and all display settings. Older ArtDrops JSON files still work. Files are limited to 2 MB and contain links and credits, not artwork files.
+**Export JSON** backs up the current exhibition; each saved playlist has its own export button. **Import JSON** loads a backup into the current exhibition with Undo, then **Playlists → Save playlist** keeps it as a named copy. Backups preserve the name, artwork order, source credits, media links, rotation, and all display settings. Older ArtDrops JSON files still work. The removed 4K portraits are skipped on reload, import, saved-playlist load, and export, with a notice. Original named snapshots remain stored until explicitly replaced or deleted; an all-removed import or named playlist does not overwrite the current exhibition. Files are limited to 2 MB and contain links and credits, not artwork files.
 
 Playlists stay in this browser on this device; they do not sync between computers, and clearing browser data removes them. Export important playlists as JSON backups before your show.
 
@@ -66,7 +66,7 @@ On Vercel, import this GitHub repository, select **Other**, use `npm run build`,
 
 ```
 public/       Page, stylesheet, favicon, checked catalog
-src/          UI, validation and persistence helpers, exhibition player
+src/          UI, curation exclusions, validation and persistence, exhibition player
 scripts/      Local server, static build, catalog maintenance
 tests/        Node built-in test runner
 docs/         Catalog methodology and release verification

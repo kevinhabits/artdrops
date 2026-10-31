@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { cleanWork, MAX_CATALOG_WORKS } from '../src/core.js';
+import { isExcludedWork } from '../src/curation.js';
 
 const sourceHosts = { SuperRare: 'superrare.com', Orkhan: 'orkhan.art', 'Google Drive': 'drive.google.com', Reddit: 'www.reddit.com' };
 
@@ -12,6 +13,7 @@ export function validateReferences(catalog, original = { works: [] }) {
   const media = new Set(original.works.map(work => work.mediaUrl));
   const collections = new Map();
   for (const work of catalog.works) {
+    if (isExcludedWork(work)) throw new Error(`${work.id}: excluded by curation`);
     if (!cleanWork(work) || !work.collection || !sourceHosts[work.source]) throw new Error(`${work.id}: invalid artwork`);
     if (ids.has(work.id) || media.has(work.mediaUrl)) throw new Error(`${work.id}: duplicate artwork`);
     ids.add(work.id); media.add(work.mediaUrl);

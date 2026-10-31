@@ -121,7 +121,7 @@ export function portraitScreenWorks(works) {
 }
 export function makePortraitMix(works, settings) {
   const candidates = portraitScreenWorks(works);
-  const count = candidates.length >= 60 ? 60 : 30;
+  const count = candidates.length >= 60 ? 60 : candidates.length >= 40 ? 40 : 30;
   if (candidates.length < count) return null;
   return { works: candidates.slice(0, count), settings: cleanSettings({ ...settings, duration: 3600 / count, shuffle: true, fit: 'contain' }) };
 }
